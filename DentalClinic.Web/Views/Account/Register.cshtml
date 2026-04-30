@@ -1,0 +1,66 @@
+@model DentalClinic.Web.ViewModels.RegisterViewModel
+@{
+    ViewData["Title"] = "Create Account";
+}
+
+<div class="container d-flex justify-content-center align-items-center py-4">
+    <div class="dc-card p-4 p-md-5" style="width:100%;max-width:500px;">
+        <div class="text-center mb-4">
+            <i class="bi bi-person-plus-fill" style="font-size:2.5rem;color:var(--dc-teal);"></i>
+            <h1 class="h4 fw-700 mt-2">Create Patient Account</h1>
+            <p class="text-muted small">Join DentaCare and book appointments online</p>
+        </div>
+
+        <form asp-action="Register" asp-controller="Account" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2" role="alert"></div>
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <label asp-for="FullName" class="form-label"></label>
+                    <input asp-for="FullName" class="form-control" placeholder="e.g. Jane Smith" id="reg-fullname" />
+                    <span asp-validation-for="FullName" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Email" class="form-label"></label>
+                    <input asp-for="Email" class="form-control" placeholder="jane@example.com" id="reg-email" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="PhoneNumber" class="form-label"></label>
+                    <input asp-for="PhoneNumber" class="form-control" placeholder="+90 555 000 0000" id="reg-phone" />
+                    <span asp-validation-for="PhoneNumber" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="DateOfBirth" class="form-label"></label>
+                    <input asp-for="DateOfBirth" type="date" class="form-control" id="reg-dob" />
+                    <span asp-validation-for="DateOfBirth" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Password" class="form-label"></label>
+                    <input asp-for="Password" class="form-control" placeholder="Min. 6 characters" id="reg-password" />
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="ConfirmPassword" class="form-label"></label>
+                    <input asp-for="ConfirmPassword" class="form-control" placeholder="Repeat password" id="reg-confirm-password" />
+                    <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-dc-primary w-100 py-2 mt-4" id="btn-register">
+                <i class="bi bi-person-check me-2"></i>Create Account
+            </button>
+        </form>
+
+        <hr class="my-4" style="border-color:var(--dc-border);" />
+        <p class="text-center text-muted small mb-0">
+            Already registered?
+            <a asp-controller="Account" asp-action="Login" class="text-teal fw-600">Sign in</a>
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

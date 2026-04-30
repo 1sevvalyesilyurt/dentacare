@@ -1,0 +1,151 @@
+@model List<DentalClinic.Web.Models.Appointment>
+@using DentalClinic.Web.Models
+@{
+    ViewData["Title"] = "My Dashboard";
+}
+
+<div class="container-fluid px-4">
+
+    <!-- Welcome Header -->
+    <div class="dc-page-header d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+            <h1>
+                <i class="bi bi-person-heart text-teal me-2"></i>
+                Welcome, @ViewBag.PatientName
+            </h1>
+            <p class="text-muted small mb-0">@DateTime.Today.ToString("dddd, dd MMMM yyyy")</p>
+        </div>
+        <a asp-controller="Appointment" asp-action="Book" class="btn btn-dc-primary">
+            <i class="bi bi-plus-circle me-1"></i>Book New Appointment
+        </a>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon teal"><i class="bi bi-calendar-check"></i></div>
+                <div>
+                    <div class="dc-stat-value">@Model.Count</div>
+                    <div class="dc-stat-label">Upcoming Appointments</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon green"><i class="bi bi-patch-check"></i></div>
+                <div>
+                    <div class="dc-stat-value">@ViewBag.PastCount</div>
+                    <div class="dc-stat-label">Completed Visits</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon amber"><i class="bi bi-wallet2"></i></div>
+                <div>
+                    <div class="dc-stat-value">₺@((decimal)ViewBag.TotalSpent).ToString("N0")</div>
+                    <div class="dc-stat-label">Total Payments</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification banner -->
+    @if ((int)ViewBag.UnreadCount > 0)
+    {
+        <div class="alert d-flex align-items-center gap-3 mb-4"
+             style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.3);border-radius:12px;color:#f0c040;">
+            <i class="bi bi-bell-fill fs-5"></i>
+            <span>You have <strong>@ViewBag.UnreadCount</strong> unread notification(s).</span>
+            <a asp-controller="Notification" asp-action="All" class="ms-auto btn btn-sm"
+               style="border:1px solid rgba(240,192,64,0.4);color:#f0c040;border-radius:8px;">View All</a>
+        </div>
+    }
+
+    <!-- Upcoming appointments -->
+    <div class="dc-card">
+        <div class="dc-card-header d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-calendar-week text-teal"></i>
+                <h5 class="mb-0 fw-600">Upcoming Appointments</h5>
+            </div>
+            <a asp-controller="Appointment" asp-action="Index" class="text-teal small fw-600 text-decoration-none">
+                View all <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+
+        @if (!Model.Any())
+        {
+            <div class="p-5 text-center">
+                <i class="bi bi-calendar-x" style="font-size:2.5rem;color:var(--dc-muted);"></i>
+                <p class="text-muted mt-3 mb-0">No upcoming appointments.</p>
+                <a asp-controller="Appointment" asp-action="Book" class="btn btn-dc-primary btn-sm mt-3">
+                    Book Now
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="p-3">
+                <div class="row g-3">
+                    @foreach (var appt in Model)
+                    {
+                        <div class="col-md-6">
+                            <div class="dc-card p-3" style="background:var(--dc-navy);">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge-confirmed">@appt.Status</span>
+                                    <span class="text-muted small fw-600">
+                                        @appt.AppointmentDate.ToString("dd MMM")
+                                        · @appt.AppointmentDate.ToString("HH:mm")
+                                    </span>
+                                </div>
+                                <div class="fw-600 mb-1">Dr. @appt.Doctor?.User?.FullName</div>
+                                <div class="text-muted small">@appt.Service?.Name</div>
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <span class="text-teal fw-700">₺@appt.Fee.ToString("N0")</span>
+                                    <form asp-controller="Appointment" asp-action="Cancel" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@appt.AppointmentId" />
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                onclick="return confirm('Cancel this appointment?')">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row g-3 mt-1">
+        <div class="col-md-4">
+            <a asp-controller="Appointment" asp-action="Book"
+               class="dc-card p-4 text-center d-block text-decoration-none" style="cursor:pointer;">
+                <i class="bi bi-calendar-plus" style="font-size:1.75rem;color:var(--dc-teal);"></i>
+                <div class="fw-600 mt-2">Book Appointment</div>
+                <div class="text-muted small">Find an available slot</div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a asp-controller="Appointment" asp-action="History"
+               class="dc-card p-4 text-center d-block text-decoration-none">
+                <i class="bi bi-clock-history" style="font-size:1.75rem;color:var(--dc-accent);"></i>
+                <div class="fw-600 mt-2">Visit History</div>
+                <div class="text-muted small">Past appointments &amp; payments</div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a asp-controller="Notification" asp-action="All"
+               class="dc-card p-4 text-center d-block text-decoration-none">
+                <i class="bi bi-bell" style="font-size:1.75rem;color:var(--dc-success);"></i>
+                <div class="fw-600 mt-2">Notifications</div>
+                <div class="text-muted small">Reminders &amp; confirmations</div>
+            </a>
+        </div>
+    </div>
+</div>

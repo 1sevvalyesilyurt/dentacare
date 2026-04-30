@@ -1,0 +1,45 @@
+@model DentalClinic.Web.Models.Appointment
+@{
+    ViewData["Title"] = "Booking Confirmed";
+}
+
+<div class="container d-flex justify-content-center py-5">
+    <div class="dc-card p-5 text-center" style="max-width:480px;width:100%;">
+        <div class="mb-3">
+            <div style="width:80px;height:80px;border-radius:50%;background:rgba(34,197,94,0.15);
+                        display:flex;align-items:center;justify-content:center;margin:0 auto;">
+                <i class="bi bi-check-lg" style="font-size:2.5rem;color:var(--dc-success);"></i>
+            </div>
+        </div>
+        <h1 class="h4 fw-700 text-success mb-1">Appointment Confirmed!</h1>
+        <p class="text-muted mb-4">Your booking has been successfully registered.</p>
+
+        <div class="dc-card p-3 text-start mb-4" style="background:var(--dc-navy);">
+            <div class="row g-2">
+                <div class="col-5 text-muted small">Date & Time</div>
+                <div class="col-7 fw-600">@Model.AppointmentDate.ToString("dddd, dd MMM yyyy 'at' HH:mm")</div>
+
+                <div class="col-5 text-muted small">Doctor</div>
+                <div class="col-7 fw-600">Dr. @Model.Doctor?.User?.FullName</div>
+
+                <div class="col-5 text-muted small">Specialty</div>
+                <div class="col-7">@Model.Doctor?.Specialty</div>
+
+                <div class="col-5 text-muted small">Service</div>
+                <div class="col-7 fw-600">@Model.Service?.Name</div>
+
+                <div class="col-5 text-muted small">Fee</div>
+                <div class="col-7 fw-700 text-teal">₺@Model.Fee.ToString("N0")</div>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2">
+            <a asp-action="Index" class="btn btn-dc-primary">
+                <i class="bi bi-calendar-check me-1"></i>View My Appointments
+            </a>
+            <a asp-action="Book" class="btn btn-outline-secondary">
+                Book Another Appointment
+            </a>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,267 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DentaCare Clinic — Site CSS
+   Design System: Dark Navy + Teal gradient palette
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Root Variables ─────────────────────────────────────────────────────── */
+:root {
+    --dc-navy:       #0f1b2d;
+    --dc-navy-mid:   #1a2d44;
+    --dc-teal:       #0fa4af;
+    --dc-teal-light: #1dbbc7;
+    --dc-accent:     #f0c040;
+    --dc-text:       #e8edf4;
+    --dc-muted:      #8fa3be;
+    --dc-card-bg:    #162235;
+    --dc-border:     #243448;
+    --dc-success:    #22c55e;
+    --dc-danger:     #ef4444;
+    --dc-radius:     12px;
+    --dc-shadow:     0 4px 24px rgba(0,0,0,0.35);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ─── Global Reset ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    min-height: 100vh;
+    background: var(--dc-navy);
+    color: var(--dc-text);
+    margin: 0;
+}
+
+/* ─── Navbar ─────────────────────────────────────────────────────────────── */
+.dc-navbar {
+    background: linear-gradient(90deg, var(--dc-navy) 0%, var(--dc-navy-mid) 100%);
+    border-bottom: 1px solid var(--dc-border);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+    padding: 0.6rem 0;
+}
+
+.dc-navbar .navbar-brand {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--dc-teal) !important;
+    letter-spacing: -0.3px;
+}
+
+.dc-navbar .nav-link {
+    color: var(--dc-muted) !important;
+    font-weight: 500;
+    font-size: 0.88rem;
+    padding: 0.4rem 0.75rem !important;
+    border-radius: 8px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.dc-navbar .nav-link:hover,
+.dc-navbar .nav-link.active {
+    color: var(--dc-teal-light) !important;
+    background: rgba(15,164,175,0.12);
+}
+
+/* ─── Avatar circle ──────────────────────────────────────────────────────── */
+.dc-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--dc-teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.8rem;
+}
+
+/* ─── Primary button ─────────────────────────────────────────────────────── */
+.btn-dc-primary {
+    background: linear-gradient(135deg, var(--dc-teal) 0%, #0d8a94 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.btn-dc-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(15,164,175,0.45);
+    color: #fff;
+}
+
+/* ─── Main content area ──────────────────────────────────────────────────── */
+.dc-main {
+    min-height: calc(100vh - 130px);
+    padding: 2rem 0 3rem;
+}
+
+/* ─── Cards ──────────────────────────────────────────────────────────────── */
+.dc-card {
+    background: var(--dc-card-bg);
+    border: 1px solid var(--dc-border);
+    border-radius: var(--dc-radius);
+    box-shadow: var(--dc-shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.dc-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
+
+.dc-card-header {
+    background: linear-gradient(135deg, var(--dc-navy-mid), var(--dc-card-bg));
+    border-bottom: 1px solid var(--dc-border);
+    border-radius: var(--dc-radius) var(--dc-radius) 0 0 !important;
+    padding: 1rem 1.25rem;
+}
+
+/* ─── Stats widget ───────────────────────────────────────────────────────── */
+.dc-stat-card {
+    background: var(--dc-card-bg);
+    border: 1px solid var(--dc-border);
+    border-radius: var(--dc-radius);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    transition: transform 0.2s;
+}
+
+.dc-stat-card:hover { transform: translateY(-3px); }
+
+.dc-stat-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.dc-stat-icon.teal   { background: rgba(15,164,175,0.18); color: var(--dc-teal); }
+.dc-stat-icon.amber  { background: rgba(240,192,64,0.18);  color: var(--dc-accent); }
+.dc-stat-icon.green  { background: rgba(34,197,94,0.18);   color: var(--dc-success); }
+.dc-stat-icon.red    { background: rgba(239,68,68,0.18);   color: var(--dc-danger); }
+
+.dc-stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1; }
+.dc-stat-label { font-size: 0.78rem; color: var(--dc-muted); margin-top: 2px; }
+
+/* ─── Tables ─────────────────────────────────────────────────────────────── */
+.dc-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+}
+
+.dc-table thead th {
+    background: var(--dc-navy-mid);
+    color: var(--dc-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--dc-border);
+}
+
+.dc-table tbody tr {
+    border-bottom: 1px solid var(--dc-border);
+    transition: background 0.15s;
+}
+
+.dc-table tbody tr:hover { background: rgba(15,164,175,0.06); }
+
+.dc-table tbody td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+    font-size: 0.9rem;
+}
+
+/* ─── Badges / Status pills ──────────────────────────────────────────────── */
+.badge-confirmed  { background: rgba(15,164,175,0.2);  color: var(--dc-teal);    border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600; }
+.badge-completed  { background: rgba(34,197,94,0.2);   color: var(--dc-success); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600; }
+.badge-cancelled  { background: rgba(239,68,68,0.2);   color: var(--dc-danger);  border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600; }
+.badge-pending    { background: rgba(240,192,64,0.2);  color: var(--dc-accent);  border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600; }
+
+/* ─── Forms ──────────────────────────────────────────────────────────────── */
+.form-control, .form-select {
+    background: var(--dc-navy-mid) !important;
+    border: 1px solid var(--dc-border) !important;
+    color: var(--dc-text) !important;
+    border-radius: 8px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--dc-teal) !important;
+    box-shadow: 0 0 0 3px rgba(15,164,175,0.25) !important;
+    outline: none;
+}
+
+.form-label { font-size: 0.85rem; font-weight: 500; color: var(--dc-muted); margin-bottom: 4px; }
+
+/* ─── Slot picker ────────────────────────────────────────────────────────── */
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.5rem; }
+
+.slot-btn {
+    background: var(--dc-navy-mid);
+    border: 1px solid var(--dc-border);
+    color: var(--dc-text);
+    border-radius: 8px;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.slot-btn:hover, .slot-btn.selected {
+    background: var(--dc-teal);
+    border-color: var(--dc-teal);
+    color: #fff;
+    transform: scale(1.04);
+}
+
+/* ─── Page header ────────────────────────────────────────────────────────── */
+.dc-page-header {
+    padding: 1.5rem 0 1rem;
+    border-bottom: 1px solid var(--dc-border);
+    margin-bottom: 2rem;
+}
+
+.dc-page-header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+.dc-footer {
+    background: var(--dc-navy-mid);
+    border-top: 1px solid var(--dc-border);
+    padding: 1rem;
+    margin-top: auto;
+}
+
+/* ─── Dropdown (dark theme) ──────────────────────────────────────────────── */
+.dropdown-menu {
+    background: var(--dc-card-bg);
+    border: 1px solid var(--dc-border);
+    border-radius: var(--dc-radius);
+}
+
+.dropdown-item { color: var(--dc-text); font-size: 0.88rem; }
+.dropdown-item:hover { background: rgba(15,164,175,0.1); color: var(--dc-teal); }
+.dropdown-divider { border-color: var(--dc-border); }
+
+/* ─── Bootstrap override — alerts ────────────────────────────────────────── */
+.alert-success { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); color: var(--dc-success); }
+.alert-danger  { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: var(--dc-danger); }
+
+/* ─── Utilities ──────────────────────────────────────────────────────────── */
+.text-teal   { color: var(--dc-teal) !important; }
+.text-muted  { color: var(--dc-muted) !important; }
+.fw-700      { font-weight: 700; }
+.fw-600      { font-weight: 600; }
