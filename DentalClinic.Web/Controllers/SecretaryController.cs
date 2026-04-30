@@ -247,6 +247,51 @@ namespace DentalClinic.Web.Controllers
             return View(services);
         }
 
+        // POST /Secretary/AddService (UC-S10)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddService(string Name, string? Description, decimal BaseFee, int DurationMinutes)
+        {
+            if (string.IsNullOrWhiteSpace(Name))
+            {
+                TempData["ErrorMessage"] = "Service name is required.";
+                return RedirectToAction(nameof(Services));
+            }
+
+            _db.Services.Add(new Service
+            {
+                Name            = Name.Trim(),
+                Description     = Description?.Trim(),
+                BaseFee         = BaseFee,
+                DurationMinutes = DurationMinutes,
+                IsActive        = true
+            });
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Service \"{Name}\" added successfully.";
+            return RedirectToAction(nameof(Services));
+        }
+
+        // POST /Secretary/EditService (UC-S10)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditService(int ServiceId, string Name, string? Description, decimal BaseFee, int DurationMinutes, bool IsActive)
+        {
+            var service = await _db.Services.FindAsync(ServiceId);
+            if (service == null) return NotFound();
+
+            service.Name            = Name.Trim();
+            service.Description     = Description?.Trim();
+            service.BaseFee         = BaseFee;
+            service.DurationMinutes = DurationMinutes;
+            service.IsActive        = IsActive;
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Service \"{Name}\" updated successfully.";
+            return RedirectToAction(nameof(Services));
+        }
+
+
         // ─── Doctor Management (UC-S02) ────────────────────────────────────────────
 
         // GET /Secretary/Doctors — Doctor list

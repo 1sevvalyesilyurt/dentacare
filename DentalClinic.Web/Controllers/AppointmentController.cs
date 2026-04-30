@@ -122,7 +122,8 @@ namespace DentalClinic.Web.Controllers
             return RedirectToAction(nameof(Confirmed), new { id = appointment.AppointmentId });
         }
 
-        // GET /Appointment/Slots?doctorId=1&date=2026-05-10 — AJAX endpoint
+        // GET /Appointment/Slots?doctorId=1&date=2026-05-10 — AJAX endpoint (used by Customer booking & Secretary CreateAppointment)
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> Slots(int doctorId, DateTime date)
         {

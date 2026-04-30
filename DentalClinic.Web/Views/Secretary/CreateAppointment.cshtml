@@ -1,0 +1,134 @@
+@model DentalClinic.Web.ViewModels.BookingViewModel
+@{
+    ViewData["Title"] = "Create Appointment";
+}
+
+<div class="container" style="max-width:720px;">
+    <div class="dc-page-header">
+        <h1><i class="bi bi-calendar-plus text-teal me-2"></i>Create Appointment</h1>
+        <p class="text-muted small mb-0">Manually book an appointment on behalf of a patient.</p>
+    </div>
+
+    <div class="dc-card p-4">
+        <form asp-action="CreateAppointment" method="post" id="create-appt-form">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2" role="alert"></div>
+
+            <!-- Patient -->
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <div style="width:4px;height:20px;background:var(--dc-teal);border-radius:2px;"></div>
+                <h6 class="mb-0 fw-600 text-teal">Patient</h6>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Patient</label>
+                <select name="customerUserId" class="form-select" required id="select-customer">
+                    <option value="">— Select Patient —</option>
+                    @foreach (var customer in (List<DentalClinic.Web.Models.Customer>)ViewBag.Customers)
+                    {
+                        <option value="@customer.User?.Id">@customer.User?.FullName (@customer.User?.Email)</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Appointment -->
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <div style="width:4px;height:20px;background:var(--dc-teal);border-radius:2px;"></div>
+                <h6 class="mb-0 fw-600 text-teal">Appointment Details</h6>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label asp-for="DoctorId" class="form-label"></label>
+                    <select asp-for="DoctorId" class="form-select" id="select-doctor">
+                        <option value="">— Select Doctor —</option>
+                        @foreach (var doctor in (List<DentalClinic.Web.Models.Doctor>)ViewBag.Doctors)
+                        {
+                            <option value="@doctor.DoctorId">Dr. @doctor.User?.FullName — @doctor.Specialty</option>
+                        }
+                    </select>
+                    <span asp-validation-for="DoctorId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="ServiceId" class="form-label"></label>
+                    <select asp-for="ServiceId" class="form-select" id="select-service">
+                        <option value="">— Select Service —</option>
+                        @foreach (var service in (List<DentalClinic.Web.Models.Service>)ViewBag.Services)
+                        {
+                            <option value="@service.ServiceId">@service.Name — ₺@service.BaseFee.ToString("N0") (@service.DurationMinutes min)</option>
+                        }
+                    </select>
+                    <span asp-validation-for="ServiceId" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="appt-date" class="form-control"
+                           min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="AppointmentDate" class="form-label">Available Time Slot</label>
+                    <select asp-for="AppointmentDate" class="form-select" id="select-slot">
+                        <option value="">— Pick doctor & date first —</option>
+                    </select>
+                    <span asp-validation-for="AppointmentDate" class="text-danger small"></span>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="PatientNote" class="form-label"></label>
+                    <textarea asp-for="PatientNote" class="form-control" rows="2"
+                              placeholder="e.g. Patient reports sensitivity in upper left molar…"></textarea>
+                    <span asp-validation-for="PatientNote" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3">
+                <button type="submit" class="btn btn-dc-primary px-4" id="btn-create-appt">
+                    <i class="bi bi-calendar-check me-1"></i>Create Appointment
+                </button>
+                <a asp-action="Calendar" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+@{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+<script>
+    async function loadSlots() {
+        const doctorId = document.getElementById('select-doctor').value;
+        const date     = document.getElementById('appt-date').value;
+        const slotSel  = document.getElementById('select-slot');
+
+        slotSel.innerHTML = '<option value="">Loading…</option>';
+
+        if (!doctorId || !date) {
+            slotSel.innerHTML = '<option value="">— Pick doctor & date first —</option>';
+            return;
+        }
+
+        try {
+            const res   = await fetch(`/Appointment/Slots?doctorId=${doctorId}&date=${date}`);
+            const slots = await res.json();
+
+            if (!slots.length) {
+                slotSel.innerHTML = '<option value="">No slots available for this day</option>';
+                return;
+            }
+
+            slotSel.innerHTML = '<option value="">— Select a time —</option>';
+            slots.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = `${date}T${s}`;
+                opt.textContent = s;
+                slotSel.appendChild(opt);
+            });
+        } catch {
+            slotSel.innerHTML = '<option value="">Error loading slots</option>';
+        }
+    }
+
+    document.getElementById('select-doctor').addEventListener('change', loadSlots);
+    document.getElementById('appt-date').addEventListener('change', loadSlots);
+</script>
+}

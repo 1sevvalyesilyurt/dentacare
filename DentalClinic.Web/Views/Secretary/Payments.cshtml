@@ -1,0 +1,158 @@
+@model DentalClinic.Web.ViewModels.PaymentDashboardViewModel
+@{
+    ViewData["Title"] = "Payments & Revenue";
+}
+
+<div class="container-fluid px-4">
+    <!-- Page Header -->
+    <div class="dc-page-header">
+        <h1><i class="bi bi-cash-coin text-teal me-2"></i>Payments & Revenue</h1>
+        <p class="text-muted small mb-0">Financial overview of the clinic</p>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon teal"><i class="bi bi-calendar-day"></i></div>
+                <div>
+                    <div class="dc-stat-value">₺@Model.TotalRevenueToday.ToString("N0")</div>
+                    <div class="dc-stat-label">Today's Revenue</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon green"><i class="bi bi-graph-up-arrow"></i></div>
+                <div>
+                    <div class="dc-stat-value">₺@Model.TotalRevenueThisMonth.ToString("N0")</div>
+                    <div class="dc-stat-label">This Month's Revenue</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon amber"><i class="bi bi-hourglass-split"></i></div>
+                <div>
+                    <div class="dc-stat-value">@Model.PendingPaymentsCount</div>
+                    <div class="dc-stat-label">Awaiting Payment</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Doctor Earnings Breakdown -->
+    <div class="dc-card mb-4">
+        <div class="dc-card-header d-flex align-items-center gap-2">
+            <i class="bi bi-person-badge text-teal"></i>
+            <h5 class="mb-0 fw-600">Doctor Earnings Breakdown</h5>
+        </div>
+        <div class="p-0">
+            @if (!Model.DoctorEarnings.Any())
+            {
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-inbox me-2"></i>No earnings data yet.
+                </div>
+            }
+            else
+            {
+                <table class="dc-table">
+                    <thead>
+                        <tr>
+                            <th>Doctor</th>
+                            <th>Specialty</th>
+                            <th>Completed</th>
+                            <th>Clinic Revenue</th>
+                            <th>Doctor's Share</th>
+                            <th>Clinic Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.DoctorEarnings.OrderByDescending(r => r.TotalRevenue))
+                        {
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="dc-avatar" style="background:var(--dc-teal);width:32px;height:32px;font-size:0.8rem;">
+                                            @row.DoctorName.Substring(0, 1).ToUpper()
+                                        </div>
+                                        <span class="fw-600">Dr. @row.DoctorName</span>
+                                    </div>
+                                </td>
+                                <td class="text-muted small">@row.Specialty</td>
+                                <td><span class="fw-600">@row.CompletedAppointments</span></td>
+                                <td class="fw-600">₺@row.TotalRevenue.ToString("N0")</td>
+                                <td class="text-teal fw-600">₺@row.DoctorShare.ToString("N0")</td>
+                                <td class="text-success fw-600">₺@((row.TotalRevenue - row.DoctorShare).ToString("N0"))</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:rgba(32,201,151,0.07);">
+                            <td colspan="3" class="fw-600 text-teal">Totals</td>
+                            <td class="fw-600">₺@Model.DoctorEarnings.Sum(r => r.TotalRevenue).ToString("N0")</td>
+                            <td class="text-teal fw-600">₺@Model.DoctorEarnings.Sum(r => r.DoctorShare).ToString("N0")</td>
+                            <td class="text-success fw-600">₺@Model.DoctorEarnings.Sum(r => r.TotalRevenue - r.DoctorShare).ToString("N0")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            }
+        </div>
+    </div>
+
+    <!-- Recent Payments -->
+    <div class="dc-card">
+        <div class="dc-card-header d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-receipt text-teal"></i>
+                <h5 class="mb-0 fw-600">Recent Payments</h5>
+            </div>
+            @if (Model.PendingPaymentsCount > 0)
+            {
+                <a asp-action="Calendar" class="btn btn-dc-primary btn-sm">
+                    <i class="bi bi-cash me-1"></i>Record Pending (@Model.PendingPaymentsCount)
+                </a>
+            }
+        </div>
+        <div class="p-0">
+            @if (!Model.RecentPayments.Any())
+            {
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-inbox me-2"></i>No payments recorded yet.
+                </div>
+            }
+            else
+            {
+                <table class="dc-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice</th>
+                            <th>Date</th>
+                            <th>Patient</th>
+                            <th>Doctor</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var pay in Model.RecentPayments)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="fw-600 text-teal" style="font-family:monospace;">@pay.InvoiceNumber</span>
+                                </td>
+                                <td class="text-muted small">@pay.PaidAt.ToString("dd MMM yyyy HH:mm")</td>
+                                <td>@pay.PatientName</td>
+                                <td>Dr. @pay.DoctorName</td>
+                                <td class="fw-600">₺@pay.Amount.ToString("N0")</td>
+                                <td>
+                                    <span class="badge bg-secondary">@pay.Method</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>

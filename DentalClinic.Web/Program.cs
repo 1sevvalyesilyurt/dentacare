@@ -135,6 +135,60 @@ static async Task SeedDataAsync(IServiceProvider services)
         await userManager.AddToRoleAsync(secretary, "Secretary");
     }
 
+    // Seed default Doctor account
+    const string doctorEmail = "doctor@dentacare.com";
+    if (await userManager.FindByEmailAsync(doctorEmail) == null)
+    {
+        var docUser = new ApplicationUser
+        {
+            UserName   = doctorEmail,
+            Email      = doctorEmail,
+            FullName   = "John Doe",
+            IsActive   = true,
+            CreatedAt  = DateTime.UtcNow,
+            EmailConfirmed = true
+        };
+        await userManager.CreateAsync(docUser, "Doctor@123");
+        await userManager.AddToRoleAsync(docUser, "Doctor");
+
+        var doctorProfile = new DentalClinic.Web.Models.Doctor
+        {
+            UserId = docUser.Id,
+            Specialty = "General Dentistry",
+            CommissionRate = 0.70m,
+            WorkingHoursStart = new TimeSpan(9, 0, 0),
+            WorkingHoursEnd = new TimeSpan(17, 0, 0),
+            SlotDurationMinutes = 30,
+            IsActive = true
+        };
+        db.Doctors.Add(doctorProfile);
+        await db.SaveChangesAsync();
+    }
+
+    // Seed default Customer account
+    const string customerEmail = "customer@dentacare.com";
+    if (await userManager.FindByEmailAsync(customerEmail) == null)
+    {
+        var custUser = new ApplicationUser
+        {
+            UserName   = customerEmail,
+            Email      = customerEmail,
+            FullName   = "Jane Smith",
+            IsActive   = true,
+            CreatedAt  = DateTime.UtcNow,
+            EmailConfirmed = true
+        };
+        await userManager.CreateAsync(custUser, "Customer@123");
+        await userManager.AddToRoleAsync(custUser, "Customer");
+
+        var customerProfile = new DentalClinic.Web.Models.Customer
+        {
+            UserId = custUser.Id
+        };
+        db.Customers.Add(customerProfile);
+        await db.SaveChangesAsync();
+    }
+
     // Seed default Services if none exist
     if (!db.Services.Any())
     {

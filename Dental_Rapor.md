@@ -3,10 +3,10 @@
 
 ---
 
-> **Document Version:** 1.0  
+> **Document Version:** 2.0  
 > **Date:** 2026-04-30  
 > **Methodology:** Kruchten's 4+1 Architectural View Model  
-> **Technology Stack:** ASP.NET Core MVC · Entity Framework Core · SQL Server · Bootstrap 5
+> **Technology Stack:** ASP.NET Core MVC 9.0 · Entity Framework Core · SQLite · Bootstrap 5 · Bootstrap Icons
 
 ---
 
@@ -492,91 +492,178 @@ This is the primary happy-path workflow.
 
 The Development View describes the **physical organization** of the codebase.
 
-### 4.1 Proposed Project Structure
+### 4.1 Gerçekleştirilen Proje Yapısı (Uygulama Tamamlandı)
 
 ```
-DentalClinic.sln
+dentacare/
 │
-├── DentalClinic.Web/                  ← Main ASP.NET Core MVC project
+├── DentalClinic.Web/                  ← ASP.NET Core MVC 9.0 ana projesi
 │   ├── Controllers/
-│   │   ├── HomeController.cs
-│   │   ├── AccountController.cs       ← Register, Login, Logout
-│   │   ├── AppointmentController.cs   ← Booking, cancellation (Customer)
-│   │   ├── SecretaryController.cs     ← Admin panel
-│   │   ├── DoctorController.cs        ← Doctor dashboard
-│   │   └── NotificationController.cs  ← Unread count API
+│   │   ├── HomeController.cs          ✅
+│   │   ├── AccountController.cs       ✅ Kayıt, Giriş, Çıkış
+│   │   ├── AppointmentController.cs   ✅ Müşteri randevu yönetimi
+│   │   │                                 (Slots endpoint: [AllowAnonymous])
+│   │   ├── CustomerController.cs      ✅ Hasta dashboard'u
+│   │   ├── SecretaryController.cs     ✅ Admin paneli (10 action)
+│   │   │                                 + AddService / EditService eklendi
+│   │   ├── DoctorController.cs        ✅ Doktor dashboard'u
+│   │   └── NotificationController.cs  ✅ Okunmamış bildirim API'si
 │   │
-│   ├── Models/                        ← Domain entities (EF Core)
-│   │   ├── ApplicationUser.cs
-│   │   ├── Doctor.cs
-│   │   ├── Customer.cs
-│   │   ├── Service.cs
-│   │   ├── Appointment.cs
-│   │   ├── Payment.cs
-│   │   ├── Notification.cs
-│   │   └── DoctorLeave.cs
+│   ├── Models/                        ← EF Core domain entity'leri
+│   │   ├── ApplicationUser.cs         ✅
+│   │   ├── Doctor.cs                  ✅
+│   │   ├── Customer.cs                ✅
+│   │   ├── Service.cs                 ✅
+│   │   ├── Appointment.cs             ✅
+│   │   ├── Payment.cs                 ✅
+│   │   ├── Notification.cs            ✅
+│   │   ├── DoctorLeave.cs             ✅
+│   │   └── Enums.cs                   ✅ AppointmentStatus, PaymentMethod
 │   │
-│   ├── ViewModels/                    ← DTOs for Views (avoid entity bloat)
-│   │   ├── BookingViewModel.cs
-│   │   ├── DoctorDashboardViewModel.cs
-│   │   └── PaymentRecordViewModel.cs
+│   ├── ViewModels/
+│   │   ├── AccountViewModels.cs       ✅ Login / Register DTO
+│   │   ├── BookingViewModel.cs        ✅
+│   │   ├── CreateDoctorViewModel.cs   ✅
+│   │   ├── DoctorDashboardViewModel.cs ✅
+│   │   └── PaymentViewModels.cs       ✅ PaymentRecord / Dashboard / Rows
 │   │
-│   ├── Services/                      ← Business logic layer
-│   │   ├── IBookingService.cs
-│   │   ├── BookingService.cs
-│   │   ├── IPaymentService.cs
-│   │   ├── PaymentService.cs
-│   │   └── ReminderBackgroundService.cs
+│   ├── Services/
+│   │   ├── IBookingService.cs         ✅
+│   │   ├── BookingService.cs          ✅
+│   │   ├── IPaymentService.cs         ✅
+│   │   ├── PaymentService.cs          ✅
+│   │   └── ReminderBackgroundService.cs ✅
 │   │
 │   ├── Data/
-│   │   ├── AppDbContext.cs            ← EF Core DbContext
-│   │   └── Migrations/               ← Auto-generated EF migrations
+│   │   ├── AppDbContext.cs            ✅
+│   │   └── Migrations/               ✅ EF Core migration'ları oluşturuldu
 │   │
 │   ├── Views/
 │   │   ├── Shared/
-│   │   │   ├── _Layout.cshtml
-│   │   │   └── _Notification.cshtml
+│   │   │   ├── _Layout.cshtml         ✅ Dark navy tema, role-based navbar
+│   │   │   └── _ValidationScriptsPartial.cshtml ✅
 │   │   ├── Account/
+│   │   │   ├── Login.cshtml           ✅
+│   │   │   └── Register.cshtml        ✅
 │   │   ├── Appointment/
-│   │   ├── Secretary/
-│   │   └── Doctor/
+│   │   │   ├── Book.cshtml            ✅ AJAX slot seçici
+│   │   │   ├── Confirmed.cshtml       ✅
+│   │   │   ├── Index.cshtml           ✅ Yaklaşan randevular
+│   │   │   └── History.cshtml         ✅ Geçmiş + ödeme durumu
+│   │   ├── Customer/
+│   │   │   └── Dashboard.cshtml       ✅ İstatistik kartları
+│   │   ├── Doctor/
+│   │   │   └── Dashboard.cshtml       ✅ Günlük program + kazanç
+│   │   └── Secretary/
+│   │       ├── Dashboard.cshtml       ✅ Klinik özeti
+│   │       ├── Calendar.cshtml        ✅ Doktora göre gruplu takvim
+│   │       ├── CreateAppointment.cshtml ✅ Manuel rezervasyon (AJAX)
+│   │       ├── Payments.cshtml        ✅ Gelir özeti + doktor payları
+│   │       ├── RecordPayment.cshtml   ✅ Ödeme kayıt formu
+│   │       ├── Customers.cshtml       ✅ Hasta listesi (canlı arama)
+│   │       ├── Services.cshtml        ✅ Hizmet yönetimi (modal)
+│   │       ├── Doctors.cshtml         ✅ Doktor listesi + aktif/pasif
+│   │       └── CreateDoctor.cshtml    ✅ Doktor oluşturma formu
 │   │
-│   └── Program.cs                     ← DI, middleware, EF, Identity setup
+│   ├── wwwroot/css/site.css           ✅ Özel tasarım sistemi
+│   │                                     (dc-radio-card, dc-table tfoot vb.)
+│   └── Program.cs                     ✅ DI, Middleware, Seed Data
 │
-└── DentalClinic.Tests/               ← Unit/Integration test project (Phase 2+)
+└── Dental_Rapor.md                   ✅ Bu rapor
 ```
 
 ---
 
-## 5. Physical View (Deployment — Phase 1 Outline)
+## 5. Physical View (Deployment)
+
+### 5.1 Geliştirme Ortamı (Phase 1 — Gerçekleştirildi)
 
 ```
-┌─────────────────────────────────────────────────┐
-│              Developer Machine / Server          │
-│                                                 │
-│  ┌──────────────────────┐  ┌───────────────┐   │
-│  │  ASP.NET Core MVC    │  │  SQL Server   │   │
-│  │  (Kestrel / IIS)     │◄─►  (LocalDB or  │   │
-│  │                      │  │   Full SQL)   │   │
-│  │  Port: 5000 / 443    │  │  Port: 1433   │   │
-│  └──────────────────────┘  └───────────────┘   │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│              Geliştirici Makinesi (macOS)             │
+│                                                      │
+│  ┌──────────────────────────┐  ┌──────────────────┐  │
+│  │  ASP.NET Core MVC 9.0    │  │     SQLite DB    │  │
+│  │  (Kestrel)               │◄─►  app.db          │  │
+│  │                          │  │  (dosya tabanlı) │  │
+│  │  http://localhost:5050   │  └──────────────────┘  │
+│  └──────────────────────────┘                        │
+│                                                      │
+│  Araçlar:                                            │
+│  • .NET SDK 9.0.313 (~/.dotnet)                      │
+│  • Homebrew (paket yöneticisi)                       │
+│  • Git (GitHub: 1sevvalyesilyurt/dentacare)          │
+└──────────────────────────────────────────────────────┘
 ```
 
-**Phase 1 Target:** Local development using `dotnet run` with SQL Server LocalDB. Full deployment configuration (IIS / Azure App Service) is deferred to Phase 2.
+**Veritabanı:** SQL Server yerine **SQLite** tercih edildi — kurulum gerektirmemesi ve çapraz platform uyumluluğu nedeniyle geliştirme ortamı için idealdir.
+
+**SDK Kurulumu:** `.NET SDK 9.0` macOS ortamında `dotnet-install.sh` script'i ile `~/.dotnet` altına kurulmuş, `~/.zshrc` ve `~/.zprofile` dosyalarına PATH eklenmiştir.
+
+**Çalıştırma Komutu:**
+```bash
+export PATH="$HOME/.dotnet:$PATH"
+cd DentalClinic.Web
+dotnet run
+# → http://localhost:5050
+```
 
 ---
 
-## Summary — Phase 1 Decisions
+## Summary — Phase 1 Kararları ve Durum
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Authentication | ASP.NET Core Identity | Built-in role management, no external dependencies |
-| Slot conflict enforcement | DB unique constraint + service-layer check | Defense in depth — prevents race conditions |
-| Reminders | `IHostedService` background timer | No external message queue needed for Phase 1 |
-| ORM strategy | Code-First with EF Core Migrations | Single source of truth in C# models |
-| Authorization | Role-based (`[Authorize(Roles="...")]`) | Simple and auditable |
+| Karar | Seçim | Gerekçe |
+|-------|-------|---------|
+| **Kimlik Doğrulama** | ASP.NET Core Identity | Yerleşik rol yönetimi, ek bağımlılık yok |
+| **Slot Çakışma Koruması** | DB unique constraint + servis katmanı kontrolü | Çift güvence — race condition önleme |
+| **Hatırlatmalar** | `IHostedService` arka plan zamanlayıcı | Phase 1 için harici mesaj kuyruğu gerekmez |
+| **ORM Stratejisi** | Code-First + EF Core Migrations | C# modellerinde tek kaynak |
+| **Yetkilendirme** | Rol tabanlı (`[Authorize(Roles="...")]`) | Sade ve denetlenebilir |
+| **Veritabanı** | SQLite | Kurulum gerektirmez, geliştirme için yeterli |
+| **UI Tasarımı** | Vanilla CSS + Bootstrap 5 | Dark navy + teal özel tema sistemi |
 
 ---
 
-*Awaiting user approval to proceed to **STEP 2: Model classes, DbContext, Controller skeletons, and View scaffolding.***
+## Phase 1 Tamamlanma Durumu
+
+### ✅ Tamamlanan İşler
+
+| Bileşen | Durum | Notlar |
+|---------|-------|---------|
+| Domain Modelleri | ✅ Tamamlandı | 8 entity, EF Core ilişkileri |
+| Veritabanı Migrasyonu | ✅ Tamamlandı | SQLite, otomatik migrate (startup) |
+| Identity & Roller | ✅ Tamamlandı | Secretary, Doctor, Customer rolleri |
+| Seed Data | ✅ Tamamlandı | 1 sekreter + 1 doktor + 1 müşteri + 8 hizmet |
+| AccountController | ✅ Tamamlandı | Kayıt, giriş, çıkış |
+| AppointmentController | ✅ Tamamlandı | Rezervasyon, iptal, geçmiş, AJAX slot |
+| CustomerController | ✅ Tamamlandı | Hasta dashboard'u |
+| DoctorController | ✅ Tamamlandı | Günlük program, tamamla aksiyonu |
+| SecretaryController | ✅ Tamamlandı | 12 aksiyon: takvim, ödeme, hizmet, doktor yönetimi |
+| NotificationController | ✅ Tamamlandı | Okunmamış badge API'si |
+| Tüm View Dosyaları | ✅ Tamamlandı | 17 Razor view dosyası |
+| CSS Tasarım Sistemi | ✅ Tamamlandı | Dark tema, animasyonlar, responsive |
+| Background Servis | ✅ Tamamlandı | 24 saatlik hatırlatma job'u |
+| Booking Servisi | ✅ Tamamlandı | Slot hesaplama, çakışma kontrolü, izin kontrolü |
+| Payment Servisi | ✅ Tamamlandı | Ödeme kayıt, fatura numarası üretimi |
+| .NET SDK Kurulumu | ✅ Tamamlandı | .NET 9.0.313, macOS ARM64 |
+
+### 🔒 Test Hesapları
+
+| Rol | E-posta | Şifre |
+|-----|---------|-------|
+| **Sekreter** | `secretary@dentacare.com` | `Admin@123` |
+| **Doktor** | `doctor@dentacare.com` | `Doctor@123` |
+| **Hasta** | `customer@dentacare.com` | `Customer@123` |
+
+### 📋 Phase 2 Planı (Sonraki Adımlar)
+
+- [ ] Profil düzenleme (UC-C09) — şifre değiştirme
+- [ ] Fatura PDF indirme (UC-S07)
+- [ ] Doktor izin yönetimi arayüzü
+- [ ] Birim testleri (xUnit)
+- [ ] Production deployment (IIS / Azure App Service)
+- [ ] HTTPS sertifika güven (`dotnet dev-certs https --trust`)
+
+---
+
+*Phase 1 geliştirme tamamlanmıştır. Sistem `http://localhost:5050` adresinde çalışmaktadır.*
