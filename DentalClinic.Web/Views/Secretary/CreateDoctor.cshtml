@@ -1,0 +1,159 @@
+@model DentalClinic.Web.ViewModels.CreateDoctorViewModel
+@{
+    ViewData["Title"] = "Add New Doctor";
+}
+
+<div class="container" style="max-width:680px;">
+    <div class="dc-page-header">
+        <h1><i class="bi bi-person-plus text-teal me-2"></i>Add New Doctor</h1>
+        <p class="text-muted small mb-0">Creates both a login account and a doctor profile in one step.</p>
+    </div>
+
+    <div class="dc-card p-4">
+        <form asp-action="CreateDoctor" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2" role="alert"></div>
+
+            <!-- ─── Account Section ────────────────────────────────── -->
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <div style="width:4px;height:20px;background:var(--dc-teal);border-radius:2px;"></div>
+                <h6 class="mb-0 fw-600 text-teal">Login Account</h6>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <label asp-for="FullName" class="form-label"></label>
+                    <div class="input-group">
+                        <span class="input-group-text" style="background:var(--dc-navy-mid);border-color:var(--dc-border);color:var(--dc-muted);">
+                            Dr.
+                        </span>
+                        <input asp-for="FullName" class="form-control" placeholder="Jane Smith" id="doctor-fullname" />
+                    </div>
+                    <span asp-validation-for="FullName" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Email" class="form-label"></label>
+                    <input asp-for="Email" class="form-control" placeholder="dr.smith@dentacare.com" id="doctor-email" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="PhoneNumber" class="form-label"></label>
+                    <input asp-for="PhoneNumber" class="form-control" placeholder="+90 555 000 0000" id="doctor-phone" />
+                    <span asp-validation-for="PhoneNumber" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Password" class="form-label"></label>
+                    <input asp-for="Password" class="form-control" placeholder="Min. 6 characters" id="doctor-password" />
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                    <div class="form-text text-muted small">Share this password securely with the doctor. They can change it after first login.</div>
+                </div>
+            </div>
+
+            <!-- ─── Doctor Profile Section ─────────────────────────── -->
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <div style="width:4px;height:20px;background:var(--dc-teal);border-radius:2px;"></div>
+                <h6 class="mb-0 fw-600 text-teal">Professional Profile</h6>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Specialty" class="form-label"></label>
+                    <select asp-for="Specialty" class="form-select" id="doctor-specialty">
+                        <option value="">— Select —</option>
+                        <option>General Dentistry</option>
+                        <option>Orthodontics</option>
+                        <option>Endodontics</option>
+                        <option>Periodontics</option>
+                        <option>Oral Surgery</option>
+                        <option>Prosthodontics</option>
+                        <option>Pediatric Dentistry</option>
+                        <option>Dental Implantology</option>
+                    </select>
+                    <span asp-validation-for="Specialty" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="CommissionRate" class="form-label">
+                        Commission Rate
+                        <span id="commission-display" class="text-teal fw-600 ms-1">70%</span>
+                    </label>
+                    <input asp-for="CommissionRate" type="range" class="form-range" min="0.1" max="1.0" step="0.05"
+                           id="commission-slider" style="accent-color:var(--dc-teal);" />
+                    <span asp-validation-for="CommissionRate" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="WorkingHoursStart" class="form-label"></label>
+                    <input asp-for="WorkingHoursStart" type="time" class="form-control" value="09:00" id="work-start" />
+                    <span asp-validation-for="WorkingHoursStart" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="WorkingHoursEnd" class="form-label"></label>
+                    <input asp-for="WorkingHoursEnd" type="time" class="form-control" value="17:00" id="work-end" />
+                    <span asp-validation-for="WorkingHoursEnd" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SlotDurationMinutes" class="form-label"></label>
+                    <select asp-for="SlotDurationMinutes" class="form-select" id="doctor-slot">
+                        <option value="15">15 minutes</option>
+                        <option value="20">20 minutes</option>
+                        <option value="30" selected>30 minutes</option>
+                        <option value="45">45 minutes</option>
+                        <option value="60">60 minutes</option>
+                    </select>
+                    <span asp-validation-for="SlotDurationMinutes" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <!-- ─── Summary preview ───────────────────────────────── -->
+            <div class="dc-card p-3 mt-4" style="background:var(--dc-navy);">
+                <div class="text-muted small mb-2 fw-600">SLOT PREVIEW</div>
+                <p class="small mb-0 text-muted" id="slot-preview">
+                    With a <strong class="text-teal" id="preview-slot">30-min</strong> slot and working hours
+                    <strong class="text-teal" id="preview-hours">09:00–17:00</strong>,
+                    this doctor can see up to <strong class="text-teal" id="preview-count">16</strong> patients per day.
+                </p>
+            </div>
+
+            <div class="d-flex gap-3 mt-4">
+                <button type="submit" class="btn btn-dc-primary px-4" id="btn-create-doctor">
+                    <i class="bi bi-person-check me-1"></i>Add Doctor
+                </button>
+                <a asp-action="Doctors" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+@{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+<script>
+    // Commission rate slider live preview
+    const slider   = document.getElementById('commission-slider');
+    const display  = document.getElementById('commission-display');
+    slider.addEventListener('input', () => {
+        display.textContent = Math.round(slider.value * 100) + '%';
+    });
+
+    // Slot preview calculation
+    function updatePreview() {
+        const start = document.getElementById('work-start').value;  // "09:00"
+        const end   = document.getElementById('work-end').value;    // "17:00"
+        const slot  = parseInt(document.getElementById('doctor-slot').value);
+
+        if (start && end && slot) {
+            const [sh, sm] = start.split(':').map(Number);
+            const [eh, em] = end.split(':').map(Number);
+            const totalMins = (eh * 60 + em) - (sh * 60 + sm);
+            const count = Math.floor(totalMins / slot);
+
+            document.getElementById('preview-slot').textContent  = slot + '-min';
+            document.getElementById('preview-hours').textContent = start + '–' + end;
+            document.getElementById('preview-count').textContent = count > 0 ? count : '0';
+        }
+    }
+
+    document.getElementById('work-start').addEventListener('change', updatePreview);
+    document.getElementById('work-end').addEventListener('change', updatePreview);
+    document.getElementById('doctor-slot').addEventListener('change', updatePreview);
+</script>
+}

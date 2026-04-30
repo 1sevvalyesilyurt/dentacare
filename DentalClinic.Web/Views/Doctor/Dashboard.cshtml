@@ -1,0 +1,140 @@
+@model DentalClinic.Web.ViewModels.DoctorDashboardViewModel
+@using DentalClinic.Web.Models
+@{
+    ViewData["Title"] = "Doctor Dashboard";
+}
+
+<div class="container-fluid px-4">
+    <!-- Page Header -->
+    <div class="dc-page-header d-flex align-items-center justify-content-between">
+        <div>
+            <h1><i class="bi bi-grid-1x2 text-teal me-2"></i>Dr. @Model.DoctorFullName</h1>
+            <p class="text-muted small mb-0">@Model.Specialty — @Model.SelectedDate.ToString("dddd, dd MMMM yyyy")</p>
+        </div>
+        <form method="get">
+            <input type="date" name="date" class="form-control" style="width:180px;"
+                   value="@Model.SelectedDate.ToString("yyyy-MM-dd")"
+                   onchange="this.form.submit()" />
+        </form>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon teal"><i class="bi bi-calendar-day"></i></div>
+                <div>
+                    <div class="dc-stat-value">@Model.TodayAppointments.Count</div>
+                    <div class="dc-stat-label">Today's Appointments</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon green"><i class="bi bi-cash-coin"></i></div>
+                <div>
+                    <div class="dc-stat-value">₺@Model.TodayEarnings.ToString("N0")</div>
+                    <div class="dc-stat-label">Today's Earnings</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon amber"><i class="bi bi-calendar-week"></i></div>
+                <div>
+                    <div class="dc-stat-value">@Model.WeekAppointments.Count</div>
+                    <div class="dc-stat-label">This Week</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon teal"><i class="bi bi-wallet2"></i></div>
+                <div>
+                    <div class="dc-stat-value">₺@Model.WeekEarnings.ToString("N0")</div>
+                    <div class="dc-stat-label">Weekly Earnings</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Schedule -->
+    <div class="dc-card">
+        <div class="dc-card-header d-flex align-items-center gap-2">
+            <i class="bi bi-list-check text-teal"></i>
+            <h5 class="mb-0 fw-600">Today's Schedule</h5>
+            <span class="badge bg-secondary ms-auto">@Model.TodayAppointments.Count patients</span>
+        </div>
+        <div class="p-0">
+            @if (!Model.TodayAppointments.Any())
+            {
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-calendar-x me-2"></i>No appointments for today.
+                </div>
+            }
+            else
+            {
+                <table class="dc-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Patient</th>
+                            <th>Service</th>
+                            <th>Note</th>
+                            <th>Fee</th>
+                            <th>Your Share</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var appt in Model.TodayAppointments)
+                        {
+                            <tr>
+                                <td class="fw-600">@appt.AppointmentDate.ToString("HH:mm")</td>
+                                <td>@appt.PatientName</td>
+                                <td><span class="text-muted small">@appt.ServiceName</span></td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(appt.PatientNote))
+                                    {
+                                        <span class="small fst-italic text-muted" title="@appt.PatientNote">
+                                            @(appt.PatientNote.Length > 40
+                                                ? appt.PatientNote[..40] + "…"
+                                                : appt.PatientNote)
+                                        </span>
+                                    }
+                                    else { <span class="text-muted small">—</span> }
+                                </td>
+                                <td class="fw-600">₺@appt.Fee.ToString("N0")</td>
+                                <td class="text-teal fw-600">₺@appt.DoctorEarning.ToString("N0")</td>
+                                <td>
+                                    @if (appt.Status == AppointmentStatus.Confirmed)
+                                    {
+                                        <span class="badge-confirmed">Confirmed</span>
+                                    }
+                                    else if (appt.Status == AppointmentStatus.Completed)
+                                    {
+                                        <span class="badge-completed">Completed</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (appt.Status == AppointmentStatus.Confirmed)
+                                    {
+                                        <form asp-action="CompleteAppointment" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@appt.AppointmentId" />
+                                            <button class="btn btn-sm btn-dc-primary"
+                                                    onclick="return confirm('Mark as completed?')">
+                                                <i class="bi bi-check2"></i> Done
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>

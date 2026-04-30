@@ -1,0 +1,130 @@
+@model DentalClinic.Web.ViewModels.BookingViewModel
+@{
+    ViewData["Title"] = "Book Appointment";
+}
+
+<div class="container" style="max-width:700px;">
+    <div class="dc-page-header">
+        <h1><i class="bi bi-calendar-plus text-teal me-2"></i>Book an Appointment</h1>
+        <p class="text-muted small mb-0">Select your doctor, service, and preferred time slot</p>
+    </div>
+
+    <div class="dc-card p-4">
+        <form asp-action="Book" method="post" id="booking-form">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2" role="alert"></div>
+
+            <!-- Step 1: Doctor -->
+            <div class="mb-4">
+                <label asp-for="DoctorId" class="form-label">
+                    <i class="bi bi-person-badge me-1"></i>Select Doctor
+                </label>
+                <select asp-for="DoctorId" class="form-select" id="select-doctor"
+                        asp-items="@(new SelectList(Model.AvailableDoctors, "DoctorId", "DisplayName"))">
+                    <option value="">— Choose a doctor —</option>
+                </select>
+                <span asp-validation-for="DoctorId" class="text-danger small"></span>
+            </div>
+
+            <!-- Step 2: Service -->
+            <div class="mb-4">
+                <label asp-for="ServiceId" class="form-label">
+                    <i class="bi bi-clipboard2-pulse me-1"></i>Select Service
+                </label>
+                <select asp-for="ServiceId" class="form-select" id="select-service"
+                        asp-items="@(new SelectList(Model.AvailableServices, "ServiceId", "DisplayName"))">
+                    <option value="">— Choose a service —</option>
+                </select>
+                <span asp-validation-for="ServiceId" class="text-danger small"></span>
+            </div>
+
+            <!-- Step 3: Date -->
+            <div class="mb-4">
+                <label class="form-label">
+                    <i class="bi bi-calendar3 me-1"></i>Select Date
+                </label>
+                <input type="date" id="select-date" class="form-control"
+                       min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                       max="@DateTime.Today.AddMonths(2).ToString("yyyy-MM-dd")" />
+            </div>
+
+            <!-- Step 4: Time Slot (populated via AJAX) -->
+            <div class="mb-4" id="slot-section" style="display:none;">
+                <label class="form-label">
+                    <i class="bi bi-clock me-1"></i>Available Time Slots
+                </label>
+                <div class="slot-grid" id="slot-grid"></div>
+                <input type="hidden" asp-for="AppointmentDate" id="selected-slot-input" />
+                <span asp-validation-for="AppointmentDate" class="text-danger small"></span>
+            </div>
+
+            <!-- Step 5: Note -->
+            <div class="mb-4">
+                <label asp-for="PatientNote" class="form-label">
+                    <i class="bi bi-chat-text me-1"></i>Your Complaint / Note
+                    <span class="text-muted">(optional)</span>
+                </label>
+                <textarea asp-for="PatientNote" class="form-control" rows="3"
+                          placeholder="Describe your symptoms or concern..."></textarea>
+                <span asp-validation-for="PatientNote" class="text-danger small"></span>
+            </div>
+
+            <div class="d-flex gap-3">
+                <button type="submit" class="btn btn-dc-primary px-4" id="btn-book">
+                    <i class="bi bi-check-circle me-1"></i>Confirm Booking
+                </button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+@{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+<script>
+    const doctorSelect = document.getElementById('select-doctor');
+    const dateInput    = document.getElementById('select-date');
+    const slotSection  = document.getElementById('slot-section');
+    const slotGrid     = document.getElementById('slot-grid');
+    const slotInput    = document.getElementById('selected-slot-input');
+
+    async function loadSlots() {
+        const doctorId = doctorSelect.value;
+        const date     = dateInput.value;
+        if (!doctorId || !date) { slotSection.style.display = 'none'; return; }
+
+        slotGrid.innerHTML = '<p class="text-muted small">Loading slots…</p>';
+        slotSection.style.display = 'block';
+        slotInput.value = '';
+
+        try {
+            const res   = await fetch(`/Appointment/Slots?doctorId=${doctorId}&date=${date}`);
+            const slots = await res.json();
+
+            if (!slots.length) {
+                slotGrid.innerHTML = '<p class="text-danger small">No available slots for this day.</p>';
+                return;
+            }
+
+            slotGrid.innerHTML = '';
+            slots.forEach(time => {
+                const btn = document.createElement('button');
+                btn.type      = 'button';
+                btn.className = 'slot-btn';
+                btn.textContent = time;
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    slotInput.value = `${date}T${time}:00`;
+                });
+                slotGrid.appendChild(btn);
+            });
+        } catch (e) {
+            slotGrid.innerHTML = '<p class="text-danger small">Could not load slots. Please try again.</p>';
+        }
+    }
+
+    doctorSelect.addEventListener('change', loadSlots);
+    dateInput.addEventListener('change', loadSlots);
+</script>
+}

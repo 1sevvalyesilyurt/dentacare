@@ -1,0 +1,127 @@
+@model List<DentalClinic.Web.Models.Appointment>
+@using DentalClinic.Web.Models
+@{
+    ViewData["Title"] = "Admin Dashboard";
+    var today = DateTime.Today;
+}
+
+<div class="container-fluid px-4">
+    <div class="dc-page-header">
+        <h1><i class="bi bi-speedometer2 text-teal me-2"></i>Secretary Dashboard</h1>
+        <p class="text-muted small mb-0">@today.ToString("dddd, dd MMMM yyyy") — Clinic Overview</p>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon teal"><i class="bi bi-calendar-day"></i></div>
+                <div>
+                    <div class="dc-stat-value">@ViewBag.TodayCount</div>
+                    <div class="dc-stat-label">Today's Appointments</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon amber"><i class="bi bi-hourglass-split"></i></div>
+                <div>
+                    <div class="dc-stat-value">@ViewBag.PendingPayments</div>
+                    <div class="dc-stat-label">Pending Payments</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon green"><i class="bi bi-person-badge"></i></div>
+                <div>
+                    <div class="dc-stat-value">@ViewBag.TotalDoctors</div>
+                    <div class="dc-stat-label">Active Doctors</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon teal"><i class="bi bi-people"></i></div>
+                <div>
+                    <div class="dc-stat-value">@ViewBag.TotalCustomers</div>
+                    <div class="dc-stat-label">Registered Patients</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="dc-card p-3 d-flex flex-wrap gap-2">
+                <a asp-action="Calendar" class="btn btn-dc-primary btn-sm">
+                    <i class="bi bi-calendar3 me-1"></i>View Calendar
+                </a>
+                <a asp-action="CreateAppointment" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-plus-circle me-1"></i>Create Appointment
+                </a>
+                <a asp-action="Payments" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-cash-coin me-1"></i>Payments
+                </a>
+                <a asp-action="Customers" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-people me-1"></i>Patients
+                </a>
+                <a asp-action="Services" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-clipboard2-pulse me-1"></i>Services
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="dc-card">
+        <div class="dc-card-header d-flex align-items-center">
+            <i class="bi bi-activity text-teal me-2"></i>
+            <h5 class="mb-0 fw-600">Recent Appointments</h5>
+        </div>
+        <div class="p-0">
+            <table class="dc-table">
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Patient</th>
+                        <th>Doctor</th>
+                        <th>Service</th>
+                        <th>Fee</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var appt in Model)
+                    {
+                        <tr>
+                            <td>@appt.AppointmentDate.ToString("dd MMM yyyy HH:mm")</td>
+                            <td>@appt.Customer?.User?.FullName</td>
+                            <td>Dr. @appt.Doctor?.User?.FullName</td>
+                            <td class="text-muted small">@appt.Service?.Name</td>
+                            <td class="fw-600">₺@appt.Fee.ToString("N0")</td>
+                            <td>
+                                @switch (appt.Status)
+                                {
+                                    case AppointmentStatus.Confirmed:
+                                        <span class="badge-confirmed">Confirmed</span>
+                                        break;
+                                    case AppointmentStatus.Completed:
+                                        <span class="badge-completed">Completed</span>
+                                        break;
+                                    case AppointmentStatus.Cancelled:
+                                        <span class="badge-cancelled">Cancelled</span>
+                                        break;
+                                    case AppointmentStatus.Pending:
+                                        <span class="badge-pending">Pending</span>
+                                        break;
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
