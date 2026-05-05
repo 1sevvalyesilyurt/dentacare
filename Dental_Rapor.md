@@ -209,6 +209,58 @@ The UI structure is organized under role-based view folders as documented in the
 
 ---
 
+### 1.6 Related Code Snippets (Partial UI + Interaction)
+
+#### Snippet 1 — Booking UI Form (Partial Frontend)
+
+```cshtml
+<form asp-action="Book" method="post" id="booking-form">
+    @Html.AntiForgeryToken()
+
+    <select asp-for="DoctorId" class="form-select" id="select-doctor"
+            asp-items="@(new SelectList(Model.AvailableDoctors, "DoctorId", "DisplayName"))">
+        <option value="">— Choose a doctor —</option>
+    </select>
+
+    <select asp-for="ServiceId" class="form-select" id="select-service"
+            asp-items="@(new SelectList(Model.AvailableServices, "ServiceId", "DisplayName"))">
+        <option value="">— Choose a service —</option>
+    </select>
+
+    <input type="hidden" asp-for="AppointmentDate" id="selected-slot-input" />
+    <button type="submit" class="btn btn-dc-primary">Confirm Booking</button>
+</form>
+```
+
+#### Snippet 2 — Use Case Endpoint Mapping (Book + Slots)
+
+```csharp
+[HttpGet]
+public async Task<IActionResult> Book()
+{
+    // populate doctors/services for booking UI
+    return View(model);
+}
+
+[HttpPost]
+[ValidateAntiForgeryToken]
+public async Task<IActionResult> Book(BookingViewModel model)
+{
+    var appointment = await _bookingService.CreateAppointmentAsync(model, userId);
+    if (appointment == null) return View(model);
+    return RedirectToAction(nameof(Confirmed), new { id = appointment.AppointmentId });
+}
+
+[HttpGet]
+public async Task<IActionResult> Slots(int doctorId, DateTime date)
+{
+    var slots = await _bookingService.GetAvailableSlotsAsync(doctorId, date);
+    return Json(slots.Select(s => s.ToString("HH:mm")));
+}
+```
+
+---
+
 ## 2. Logical View
 
 The Logical View describes the **static structure** of the system — the key domain entities, their attributes, and the relationships between them.
@@ -548,6 +600,30 @@ Partial backend implementation in Stage 1 is evidenced by:
 
 ---
 
+### 2.6 Related Code Snippets (Partial Backend)
+
+#### Snippet — Entity Relationship and Constraint Definitions
+
+```csharp
+builder.Entity<Appointment>()
+    .HasOne(a => a.Doctor)
+    .WithMany(d => d.Appointments)
+    .HasForeignKey(a => a.DoctorId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+builder.Entity<Appointment>()
+    .HasIndex(a => new { a.DoctorId, a.AppointmentDate })
+    .IsUnique()
+    .HasDatabaseName("UX_Appointment_Doctor_DateTime");
+
+builder.Entity<Payment>()
+    .HasIndex(p => p.AppointmentId)
+    .IsUnique()
+    .HasDatabaseName("UX_Payment_AppointmentId");
+```
+
+---
+
 ## 3. Process View
 
 The Process View captures the **dynamic behavior** of the system — the key workflows showing how components interact at runtime.
@@ -630,6 +706,28 @@ flowchart TD
 8. **System simultaneously creates** a `Notification` record for the customer: *"Your appointment with Dr. [Name] on [Date] at [Time] is confirmed."*
 9. **Customer is redirected** to their upcoming appointments view with a success notification.
 
+#### Related Code Snippet — Booking Workflow Logic
+
+```csharp
+bool slotTaken = await _db.Appointments.AnyAsync(a =>
+    a.DoctorId == model.DoctorId
+    && a.AppointmentDate == model.AppointmentDate
+    && a.Status != AppointmentStatus.Cancelled);
+if (slotTaken) return null;
+
+bool onLeave = await _db.DoctorLeaves.AnyAsync(l =>
+    l.DoctorId == model.DoctorId
+    && l.StartDate.Date <= model.AppointmentDate.Date
+    && l.EndDate.Date >= model.AppointmentDate.Date);
+if (onLeave) return null;
+
+_db.Appointments.Add(appointment);
+await _db.SaveChangesAsync();
+
+_db.Notifications.Add(notification);
+await _db.SaveChangesAsync();
+```
+
 ---
 
 ### 3.2 Process 2: Secretary Records a Payment
@@ -683,6 +781,28 @@ sequenceDiagram
 5. A `Payment` record is created with an auto-generated `InvoiceNumber` (format: `INV-YYYYMMDD-{ID}`).
 6. Secretary is shown a printable invoice preview.
 
+#### Related Code Snippet — Payment Processing Logic
+
+```csharp
+if (appointment.Status != AppointmentStatus.Completed) return null;
+if (appointment.Payment != null) return null;
+
+var invoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{appointment.AppointmentId:D5}";
+
+var payment = new Payment
+{
+    AppointmentId = model.AppointmentId,
+    Amount = model.Amount,
+    PaymentMethod = model.PaymentMethod,
+    PaidAt = DateTime.UtcNow,
+    RecordedByUserId = secretaryUserId,
+    InvoiceNumber = invoiceNumber
+};
+
+_db.Payments.Add(payment);
+await _db.SaveChangesAsync();
+```
+
 ---
 
 ### 3.3 Process 3: Automated Reminder Notification (Background Job)
@@ -715,6 +835,26 @@ sequenceDiagram
 ```
 
 **Implementation Note:** The background job is implemented as an `IHostedService` registered in `Program.cs`. It runs on a configurable `Timer` interval (default: every 60 minutes). The `Appointment` entity includes a `ReminderSent` boolean flag to prevent duplicate notifications.
+
+#### Related Code Snippet — Automated Reminder Workflow
+
+```csharp
+var upcomingAppointments = await db.Appointments
+    .Where(a => a.Status == AppointmentStatus.Confirmed
+             && !a.ReminderSent
+             && a.AppointmentDate >= now
+             && a.AppointmentDate <= cutoff)
+    .ToListAsync();
+
+foreach (var appointment in upcomingAppointments)
+{
+    db.Notifications.Add(notification);
+    appointment.ReminderSent = true;
+}
+
+if (upcomingAppointments.Any())
+    await db.SaveChangesAsync();
+```
 
 ---
 ## Summary — Stage 1 Coverage
