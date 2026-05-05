@@ -116,33 +116,41 @@ flowchart LR
     Customer["Customer (Patient)"]
     System["System (Automated)"]
 
-    UC_S02["Manage Doctors"]
-    UC_S03["View All Calendars"]
-    UC_S04["Create Manual Appointment"]
-    UC_S05["Cancel / Reschedule Appointment"]
-    UC_S06["Record Payment"]
-    UC_S08["View Payment Dashboard"]
-    UC_S09["Manage Customers"]
-    UC_S10["Manage Services / Treatments"]
+    subgraph SEC["Secretary Portal Use Cases"]
+        UC_S02["Manage Doctors"]
+        UC_S03["View All Calendars"]
+        UC_S04["Create Manual Appointment"]
+        UC_S05["Cancel / Reschedule Appointment"]
+        UC_S06["Record Payment"]
+        UC_S08["View Payment Dashboard"]
+        UC_S09["Manage Customers"]
+        UC_S10["Manage Services / Treatments"]
+    end
 
-    UC_D02["View Daily Schedule"]
-    UC_D03["View Weekly Calendar"]
-    UC_D04["View Patient Notes"]
-    UC_D05["View Earnings Summary"]
-    UC_D06["Mark Appointment as Completed"]
+    subgraph DOC["Doctor Portal Use Cases"]
+        UC_D02["View Daily Schedule"]
+        UC_D03["View Weekly Calendar"]
+        UC_D04["View Patient Notes"]
+        UC_D05["View Earnings Summary"]
+        UC_D06["Mark Appointment as Completed"]
+    end
 
-    UC_C01["Register"]
-    UC_C02["Login / Logout"]
-    UC_C03["Browse Available Slots"]
-    UC_C04["Book Appointment"]
-    UC_C05["Cancel Appointment"]
-    UC_C06["View Upcoming Appointments"]
-    UC_C07["View Appointment History"]
-    UC_C08["View Payment History"]
-    UC_C09["Update Profile"]
+    subgraph CUS["Customer Portal Use Cases"]
+        UC_C01["Register"]
+        UC_C02["Login / Logout"]
+        UC_C03["Browse Available Slots"]
+        UC_C04["Book Appointment"]
+        UC_C05["Cancel Appointment"]
+        UC_C06["View Upcoming Appointments"]
+        UC_C07["View Appointment History"]
+        UC_C08["View Payment History"]
+        UC_C09["Update Profile"]
+    end
 
-    UC_SYS01["Send Appointment Reminders"]
-    UC_SYS02["Enforce Slot Conflict Check"]
+    subgraph SYS["Automated Use Cases"]
+        UC_SYS01["Send Appointment Reminders"]
+        UC_SYS02["Enforce Slot Conflict Check"]
+    end
 
     Secretary --> UC_S02
     Secretary --> UC_S03
@@ -171,6 +179,11 @@ flowchart LR
 
     System --> UC_SYS01
     System --> UC_SYS02
+
+    classDef actor fill:#16324f,color:#ffffff,stroke:#16324f,stroke-width:1px;
+    classDef usecase fill:#e8f0fb,color:#1a2b3c,stroke:#4b6b8a,stroke-width:1px;
+    class Secretary,Doctor,Customer,System actor;
+    class UC_S02,UC_S03,UC_S04,UC_S05,UC_S06,UC_S08,UC_S09,UC_S10,UC_D02,UC_D03,UC_D04,UC_D05,UC_D06,UC_C01,UC_C02,UC_C03,UC_C04,UC_C05,UC_C06,UC_C07,UC_C08,UC_C09,UC_SYS01,UC_SYS02 usecase;
 ```
 
 ### 1.4 Partial UI Implementation (Stage 1 Scope)
@@ -361,7 +374,84 @@ Customer    (1) ──────── (N)    Notification
 Doctor      (1) ──────── (N)    DoctorLeave
 ```
 
-### 2.3 Class Diagram (Mermaid)
+### 2.3 Entity Relationship Diagram (Visual)
+
+```mermaid
+erDiagram
+    APPLICATION_USER ||--o| DOCTOR : has_profile
+    APPLICATION_USER ||--o| CUSTOMER : has_profile
+    DOCTOR ||--o{ APPOINTMENT : assigned_to
+    CUSTOMER ||--o{ APPOINTMENT : books
+    SERVICE ||--o{ APPOINTMENT : includes
+    APPOINTMENT ||--o| PAYMENT : has_payment
+    CUSTOMER ||--o{ NOTIFICATION : receives
+    DOCTOR ||--o{ DOCTOR_LEAVE : has_leave
+
+    APPLICATION_USER {
+        string Id PK
+        string FullName
+        string Email
+        string PhoneNumber
+        datetime CreatedAt
+        boolean IsActive
+    }
+    DOCTOR {
+        int DoctorId PK
+        string UserId FK
+        string Specialty
+        decimal CommissionRate
+        time WorkingHoursStart
+        time WorkingHoursEnd
+        int SlotDurationMinutes
+    }
+    CUSTOMER {
+        int CustomerId PK
+        string UserId FK
+        string MedicalNotes
+    }
+    SERVICE {
+        int ServiceId PK
+        string Name
+        decimal BaseFee
+        int DurationMinutes
+        boolean IsActive
+    }
+    APPOINTMENT {
+        int AppointmentId PK
+        int CustomerId FK
+        int DoctorId FK
+        int ServiceId FK
+        datetime AppointmentDate
+        string Status
+        decimal Fee
+        boolean ReminderSent
+    }
+    PAYMENT {
+        int PaymentId PK
+        int AppointmentId FK
+        decimal Amount
+        string PaymentMethod
+        datetime PaidAt
+        string InvoiceNumber
+    }
+    NOTIFICATION {
+        int NotificationId PK
+        int CustomerId FK
+        int AppointmentId FK
+        string Message
+        boolean IsRead
+        datetime CreatedAt
+    }
+    DOCTOR_LEAVE {
+        int LeaveId PK
+        int DoctorId FK
+        datetime StartDate
+        datetime EndDate
+        string Reason
+    }
+```
+
+### 2.4 Class Diagram (Mermaid)
 
 ```mermaid
 classDiagram
@@ -442,7 +532,7 @@ classDiagram
     Doctor "1" --> "N" DoctorLeave
 ```
 
-### 2.4 Backend Structure and Partial Backend Implementation
+### 2.5 Backend Structure and Partial Backend Implementation
 
 The backend is organized with clear responsibility boundaries:
 - **Controllers Layer:** handles HTTP requests and role-specific endpoints (`AccountController`, `AppointmentController`, `SecretaryController`, `DoctorController`, `NotificationController`).
@@ -468,40 +558,61 @@ This is the primary happy-path workflow.
 
 **Actors involved:** Customer, System, Database
 
+```mermaid
+sequenceDiagram
+    actor Customer
+    participant UI as Web UI
+    participant Ctrl as AppointmentController
+    participant Svc as BookingService
+    participant DB as Database
+
+    Customer->>UI: Open booking page
+    UI->>Ctrl: GET /Appointment/Book
+    Ctrl->>DB: Query doctors + services + booked slots
+    DB-->>Ctrl: Result sets
+    Ctrl-->>UI: Booking form with selectable slots
+    UI-->>Customer: Show available time slots
+
+    Customer->>UI: Submit booking form
+    UI->>Ctrl: POST /Appointment/Book
+    Ctrl->>Svc: CreateAppointmentAsync(model)
+    Svc->>DB: Validate conflict (DoctorId + DateTime)
+    DB-->>Svc: Slot free/taken
+    Svc->>DB: Validate doctor leave overlap
+    DB-->>Svc: Available/on leave
+
+    alt Slot available and doctor available
+        Svc->>DB: INSERT Appointment (Confirmed)
+        Svc->>DB: INSERT Notification (confirmation)
+        DB-->>Svc: Saved (AppointmentId)
+        Svc-->>Ctrl: Success
+        Ctrl-->>UI: Redirect /Appointment/Confirmed
+        UI-->>Customer: Booking confirmed
+    else Slot conflict or leave
+        Svc-->>Ctrl: Validation failure
+        Ctrl-->>UI: Return form with error
+        UI-->>Customer: "Slot unavailable"
+    end
 ```
-┌──────────────┐        ┌───────────────────────┐        ┌────────────────┐
-│   Customer   │        │  AppointmentController │        │   Database     │
-│  (Browser)   │        │  + BookingService      │        │  (SQL Server)  │
-└──────┬───────┘        └───────────┬───────────┘        └───────┬────────┘
-       │                            │                             │
-  1.  ─┤ GET /Appointment/Book      │                             │
-       │ (selects Doctor + Date)    │                             │
-       ├──────────────────────────► │                             │
-       │                            ├─ Query available slots ────►│
-       │                            │◄─ Returns booked times ─────┤
-       │                            │  (existing appointments)    │
-       │◄── Returns Slot Picker UI ─┤                             │
-       │                            │                             │
-  2.  ─┤ POST /Appointment/Book     │                             │
-       │ (Doctor, DateTime, Service,│                             │
-       │  PatientNote)              │                             │
-       ├──────────────────────────► │                             │
-       │                            ├─ [VALIDATE] ModelState     │
-       │                            ├─ [CHECK] Is slot taken? ───►│
-       │                            │◄─ Slot is FREE ─────────────┤
-       │                            ├─ [CHECK] Is doctor on leave?►│
-       │                            │◄─ Doctor is AVAILABLE ───────┤
-       │                            │                             │
-       │                            ├─ Create Appointment record ►│
-       │                            │  Status = "Confirmed"       │
-       │                            │◄─ Appointment saved (ID=42) ┤
-       │                            │                             │
-       │                            ├─ Create Notification record►│
-       │                            │  "Your appointment is       │
-       │                            │   confirmed for [Date]"     │
-       │◄── Redirect to             │                             │
-       │    /Appointment/Confirmed  │                             │
-       │    + Success toast         │                             │
+
+#### 3.1.1 Activity Diagram: Booking Decision Flow
+
+```mermaid
+flowchart TD
+    A([Customer login]) --> B[Open booking form]
+    B --> C[Select doctor, service, date, time]
+    C --> D{Model valid?}
+    D -- No --> E[Show validation errors]
+    E --> C
+    D -- Yes --> F{Slot conflict?}
+    F -- Yes --> G[Show slot unavailable message]
+    G --> C
+    F -- No --> H{Doctor on leave?}
+    H -- Yes --> I[Show unavailable due to leave]
+    I --> C
+    H -- No --> J[Create appointment as Confirmed]
+    J --> K[Create confirmation notification]
+    K --> L([Redirect to confirmation page])
 ```
 
 **Step-by-Step Narrative:**
@@ -525,32 +636,40 @@ This is the primary happy-path workflow.
 
 **Actors involved:** Secretary, System, Database
 
-```
-┌───────────────┐     ┌──────────────────────┐     ┌──────────────┐
-│   Secretary   │     │  PaymentController   │     │   Database   │
-└──────┬────────┘     └──────────┬───────────┘     └──────┬───────┘
-       │                         │                          │
-  1.  ─┤ GET /Payment/Record     │                          │
-       │ (filters by Completed   │                          │
-       │  appointments)          │                          │
-       ├───────────────────────► │                          │
-       │                         ├─ Query Completed appts ─►│
-       │◄── Returns payment form─┤◄─ Returns list ──────────┤
-       │                         │                          │
-  2.  ─┤ POST /Payment/Record    │                          │
-       │ (AppointmentId, Amount, │                          │
-       │  PaymentMethod)         │                          │
-       ├───────────────────────► │                          │
-       │                         ├─ Validate: Status ==     │
-       │                         │   "Completed"? ─────────►│
-       │                         │◄─ Yes ───────────────────┤
-       │                         ├─ Validate: Payment       │
-       │                         │   already exists? ──────►│
-       │                         │◄─ No (not yet paid) ─────┤
-       │                         ├─ Create Payment record ─►│
-       │                         ├─ Generate InvoiceNumber  │
-       │◄─ Redirect + Invoice    │◄─ Saved ─────────────────┤
-       │   preview               │                          │
+```mermaid
+sequenceDiagram
+    actor Secretary
+    participant UI as Secretary UI
+    participant Ctrl as SecretaryController
+    participant Svc as PaymentService
+    participant DB as Database
+
+    Secretary->>UI: Open payment record page
+    UI->>Ctrl: GET /Secretary/RecordPayment/{appointmentId}
+    Ctrl->>DB: Query appointment + payment status
+    DB-->>Ctrl: Appointment data
+    Ctrl-->>UI: Payment form (amount/method)
+
+    Secretary->>UI: Submit payment
+    UI->>Ctrl: POST /Secretary/RecordPayment
+    Ctrl->>Svc: RecordPaymentAsync(model)
+    Svc->>DB: Validate appointment is Completed
+    DB-->>Svc: Status result
+    Svc->>DB: Validate no existing payment
+    DB-->>Svc: Duplicate check result
+
+    alt Valid and unpaid appointment
+        Svc->>DB: INSERT Payment
+        Svc->>DB: Generate and persist invoice number
+        DB-->>Svc: Saved
+        Svc-->>Ctrl: InvoiceNumber
+        Ctrl-->>UI: Redirect Payments + success message
+        UI-->>Secretary: Payment recorded
+    else Invalid status or already paid
+        Svc-->>Ctrl: Failure
+        Ctrl-->>UI: Return form with error
+        UI-->>Secretary: "Payment could not be recorded"
+    end
 ```
 
 **Step-by-Step Narrative:**
@@ -570,33 +689,29 @@ This is the primary happy-path workflow.
 
 **Actors involved:** System (Background Scheduler), Database, Customer (passive recipient)
 
-```
-┌──────────────────────────┐      ┌─────────────────┐
-│  IHostedService          │      │   Database      │
-│  (ReminderBackgroundJob) │      │   (SQL Server)  │
-└───────────┬──────────────┘      └────────┬────────┘
-            │                              │
-  [Runs every hour via Timer]              │
-            │                              │
-            ├─ Query: Appointments WHERE ─►│
-            │   Status = "Confirmed"       │
-            │   AND AppointmentDate        │
-            │   BETWEEN Now AND Now+24h    │
-            │   AND NotificationSent=false │
-            │◄─ Returns N appointments ────┤
-            │                              │
-            │  [For each appointment:]     │
-            ├─ Insert Notification ───────►│
-            │   "Reminder: Your appt       │
-            │    is in less than 24hrs"    │
-            ├─ Mark NotificationSent=true ►│
-            │◄─ Saved ─────────────────────┤
-            │                              │
-  [Customer next opens portal]
-            │
-            Customer polls GET /Notification/Unread
-            → Badge count updates
-            → Reminder visible in notification center
+```mermaid
+sequenceDiagram
+    participant Job as ReminderBackgroundService
+    participant DB as Database
+    actor Customer
+    participant UI as Customer UI
+
+    loop Every 60 minutes
+        Job->>DB: Query confirmed appointments in next 24h\nwhere ReminderSent = false
+        DB-->>Job: Upcoming appointment list
+        alt Appointments found
+            Job->>DB: INSERT Notification per appointment
+            Job->>DB: UPDATE Appointment.ReminderSent = true
+            DB-->>Job: Save complete
+        else No records
+            DB-->>Job: Empty set
+        end
+    end
+
+    Customer->>UI: Open portal
+    UI->>DB: Request unread notification count
+    DB-->>UI: Count and notification list
+    UI-->>Customer: Badge + reminder visibility
 ```
 
 **Implementation Note:** The background job is implemented as an `IHostedService` registered in `Program.cs`. It runs on a configurable `Timer` interval (default: every 60 minutes). The `Appointment` entity includes a `ReminderSent` boolean flag to prevent duplicate notifications.
