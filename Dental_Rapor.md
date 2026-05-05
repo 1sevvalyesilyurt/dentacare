@@ -10,6 +10,31 @@
 
 ---
 
+## 0. System Selection
+
+### 0.1 System Definition
+The selected system is a **Dental Clinic Online Appointment & Management System** designed to support appointment operations, role-based access, and core clinic administration in a single web platform.
+
+### 0.2 Purpose of the System
+The system aims to digitalize and coordinate daily clinic workflows that are traditionally handled manually (phone booking, paper-based schedule tracking, and fragmented payment records). It provides a structured software solution aligned with modern architecture principles.
+
+### 0.3 Target Users
+- **Secretary (Admin):** manages doctors, appointments, services, customers, and payments.
+- **Doctor:** monitors personal schedule, patient notes, and appointment completion status.
+- **Customer (Patient):** registers, logs in, books appointments, and tracks upcoming/past visits.
+- **System (Automated):** executes reminder generation as an internal background process.
+
+### 0.4 Main Functionalities
+- Role-based authentication and authorization.
+- Appointment slot browsing and booking.
+- Appointment cancellation and completion lifecycle.
+- Secretary-side calendar, doctor management, and payment recording.
+- Revenue and earnings visibility based on appointment/payment data.
+- Automated in-app reminder generation for upcoming appointments.
+- Slot conflict prevention and business-rule enforcement.
+
+---
+
 ## 1. Use Case View (Scenarios View)
 
 The Use Case View captures the **functional requirements** from each actor's perspective. It serves as the central document that drives all other architectural views.
@@ -82,7 +107,83 @@ The Use Case View captures the **functional requirements** from each actor's per
 
 ---
 
-### 1.3 Business Rules
+### 1.3 Use Case Diagram (Textual UML Representation)
+
+```mermaid
+flowchart LR
+    Secretary["Secretary (Admin)"]
+    Doctor["Doctor"]
+    Customer["Customer (Patient)"]
+    System["System (Automated)"]
+
+    UC_S02["Manage Doctors"]
+    UC_S03["View All Calendars"]
+    UC_S04["Create Manual Appointment"]
+    UC_S05["Cancel / Reschedule Appointment"]
+    UC_S06["Record Payment"]
+    UC_S08["View Payment Dashboard"]
+    UC_S09["Manage Customers"]
+    UC_S10["Manage Services / Treatments"]
+
+    UC_D02["View Daily Schedule"]
+    UC_D03["View Weekly Calendar"]
+    UC_D04["View Patient Notes"]
+    UC_D05["View Earnings Summary"]
+    UC_D06["Mark Appointment as Completed"]
+
+    UC_C01["Register"]
+    UC_C02["Login / Logout"]
+    UC_C03["Browse Available Slots"]
+    UC_C04["Book Appointment"]
+    UC_C05["Cancel Appointment"]
+    UC_C06["View Upcoming Appointments"]
+    UC_C07["View Appointment History"]
+    UC_C08["View Payment History"]
+    UC_C09["Update Profile"]
+
+    UC_SYS01["Send Appointment Reminders"]
+    UC_SYS02["Enforce Slot Conflict Check"]
+
+    Secretary --> UC_S02
+    Secretary --> UC_S03
+    Secretary --> UC_S04
+    Secretary --> UC_S05
+    Secretary --> UC_S06
+    Secretary --> UC_S08
+    Secretary --> UC_S09
+    Secretary --> UC_S10
+
+    Doctor --> UC_D02
+    Doctor --> UC_D03
+    Doctor --> UC_D04
+    Doctor --> UC_D05
+    Doctor --> UC_D06
+
+    Customer --> UC_C01
+    Customer --> UC_C02
+    Customer --> UC_C03
+    Customer --> UC_C04
+    Customer --> UC_C05
+    Customer --> UC_C06
+    Customer --> UC_C07
+    Customer --> UC_C08
+    Customer --> UC_C09
+
+    System --> UC_SYS01
+    System --> UC_SYS02
+```
+
+### 1.4 Partial UI Implementation (Stage 1 Scope)
+
+As required in Stage 1, partial UI implementation is represented by role-oriented interface modules:
+- **Portal Entry & Role Login Screens:** separate access paths for Secretary, Doctor, and Customer.
+- **Customer UI Flow:** appointment booking form (doctor/service/date-time selection), upcoming appointments view, and history navigation.
+- **Doctor UI Flow:** dashboard-oriented schedule view and appointment status update action.
+- **Secretary UI Flow:** dashboard, doctor creation/management, appointment handling, and payment recording interface.
+
+The UI structure is organized under role-based view folders as documented in the project structure (e.g., `Views/Account`, `Views/Appointment`, `Views/Doctor`, `Views/Secretary`), which demonstrates partial front-end implementation aligned with use cases.
+
+### 1.5 Business Rules
 
 | BR | Rule |
 |----|------|
@@ -341,6 +442,20 @@ classDiagram
     Doctor "1" --> "N" DoctorLeave
 ```
 
+### 2.4 Backend Structure and Partial Backend Implementation
+
+The backend is organized with clear responsibility boundaries:
+- **Controllers Layer:** handles HTTP requests and role-specific endpoints (`AccountController`, `AppointmentController`, `SecretaryController`, `DoctorController`, `NotificationController`).
+- **Service Layer:** encapsulates business logic (`BookingService`, `PaymentService`, `ReminderBackgroundService`) and enforces core business rules.
+- **Data Access Layer:** `AppDbContext` manages entity sets, relationships, constraints, and migrations.
+- **Identity/Authorization Layer:** `ApplicationUser` + role model (`Secretary`, `Doctor`, `Customer`) provides role-scoped access.
+
+Partial backend implementation in Stage 1 is evidenced by:
+- appointment booking logic with slot and leave validation,
+- payment recording logic with completed-status and uniqueness checks,
+- background reminder workflow logic through hosted service behavior,
+- domain entities and relationship definitions mapped to persistent storage.
+
 ---
 
 ## 3. Process View
@@ -487,96 +602,12 @@ This is the primary happy-path workflow.
 **Implementation Note:** The background job is implemented as an `IHostedService` registered in `Program.cs`. It runs on a configurable `Timer` interval (default: every 60 minutes). The `Appointment` entity includes a `ReminderSent` boolean flag to prevent duplicate notifications.
 
 ---
+## Summary — Stage 1 Coverage
 
-## 4. Development View (Supplementary — Phase 1 Outline)
+This Stage 1 submission includes:
+- **System Selection** (system definition, purpose, target users, and core functionalities),
+- **Use Case View** (actors, use cases, interactions, business rules, and partial UI scope),
+- **Logical View** (entity model, class diagram, component responsibilities, and partial backend scope),
+- **Process View** (workflow behavior for booking, payment, and automated reminders).
 
-The Development View describes the **physical organization** of the codebase.
-
-### 4.1 Proposed Project Structure
-
-```
-DentalClinic.sln
-│
-├── DentalClinic.Web/                  ← Main ASP.NET Core MVC project
-│   ├── Controllers/
-│   │   ├── HomeController.cs
-│   │   ├── AccountController.cs       ← Register, Login, Logout
-│   │   ├── AppointmentController.cs   ← Booking, cancellation (Customer)
-│   │   ├── SecretaryController.cs     ← Admin panel
-│   │   ├── DoctorController.cs        ← Doctor dashboard
-│   │   └── NotificationController.cs  ← Unread count API
-│   │
-│   ├── Models/                        ← Domain entities (EF Core)
-│   │   ├── ApplicationUser.cs
-│   │   ├── Doctor.cs
-│   │   ├── Customer.cs
-│   │   ├── Service.cs
-│   │   ├── Appointment.cs
-│   │   ├── Payment.cs
-│   │   ├── Notification.cs
-│   │   └── DoctorLeave.cs
-│   │
-│   ├── ViewModels/                    ← DTOs for Views (avoid entity bloat)
-│   │   ├── BookingViewModel.cs
-│   │   ├── DoctorDashboardViewModel.cs
-│   │   └── PaymentRecordViewModel.cs
-│   │
-│   ├── Services/                      ← Business logic layer
-│   │   ├── IBookingService.cs
-│   │   ├── BookingService.cs
-│   │   ├── IPaymentService.cs
-│   │   ├── PaymentService.cs
-│   │   └── ReminderBackgroundService.cs
-│   │
-│   ├── Data/
-│   │   ├── AppDbContext.cs            ← EF Core DbContext
-│   │   └── Migrations/               ← Auto-generated EF migrations
-│   │
-│   ├── Views/
-│   │   ├── Shared/
-│   │   │   ├── _Layout.cshtml
-│   │   │   └── _Notification.cshtml
-│   │   ├── Account/
-│   │   ├── Appointment/
-│   │   ├── Secretary/
-│   │   └── Doctor/
-│   │
-│   └── Program.cs                     ← DI, middleware, EF, Identity setup
-│
-└── DentalClinic.Tests/               ← Unit/Integration test project (Phase 2+)
-```
-
----
-
-## 5. Physical View (Deployment — Phase 1 Outline)
-
-```
-┌─────────────────────────────────────────────────┐
-│              Developer Machine / Server          │
-│                                                 │
-│  ┌──────────────────────┐  ┌───────────────┐   │
-│  │  ASP.NET Core MVC    │  │  SQL Server   │   │
-│  │  (Kestrel / IIS)     │◄─►  (LocalDB or  │   │
-│  │                      │  │   Full SQL)   │   │
-│  │  Port: 5000 / 443    │  │  Port: 1433   │   │
-│  └──────────────────────┘  └───────────────┘   │
-└─────────────────────────────────────────────────┘
-```
-
-**Phase 1 Target:** Local development using `dotnet run` with SQL Server LocalDB. Full deployment configuration (IIS / Azure App Service) is deferred to Phase 2.
-
----
-
-## Summary — Phase 1 Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Authentication | ASP.NET Core Identity | Built-in role management, no external dependencies |
-| Slot conflict enforcement | DB unique constraint + service-layer check | Defense in depth — prevents race conditions |
-| Reminders | `IHostedService` background timer | No external message queue needed for Phase 1 |
-| ORM strategy | Code-First with EF Core Migrations | Single source of truth in C# models |
-| Authorization | Role-based (`[Authorize(Roles="...")]`) | Simple and auditable |
-
----
-
-*Awaiting user approval to proceed to **STEP 2: Model classes, DbContext, Controller skeletons, and View scaffolding.***
+Accordingly, the report is aligned with Stage 1 expectations: architectural foundation plus partial frontend and backend implementation evidence.
