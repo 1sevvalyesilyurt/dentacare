@@ -69,6 +69,39 @@ public class BookingViewModelTests
     }
 
     [Fact]
+    public void Validate_DateBeyond6Months_ReturnsError()
+    {
+        var model = new BookingViewModel
+        {
+            DoctorId        = 1,
+            ServiceId       = 1,
+            AppointmentDate = DateTime.UtcNow.AddMonths(6).AddDays(1)
+        };
+
+        var errors = Validate(model);
+
+        Assert.Contains(errors, e =>
+            e.MemberNames.Contains(nameof(BookingViewModel.AppointmentDate)) &&
+            e.ErrorMessage!.Contains("6 months"));
+    }
+
+    [Fact]
+    public void Validate_DateExactly6Months_NoError()
+    {
+        var model = new BookingViewModel
+        {
+            DoctorId        = 1,
+            ServiceId       = 1,
+            AppointmentDate = DateTime.UtcNow.AddMonths(6).AddMinutes(-1)
+        };
+
+        var errors = Validate(model);
+
+        Assert.DoesNotContain(errors, e =>
+            e.MemberNames.Contains(nameof(BookingViewModel.AppointmentDate)));
+    }
+
+    [Fact]
     public void Validate_PatientNoteOver500Chars_ReturnsError()
     {
         var model = new BookingViewModel

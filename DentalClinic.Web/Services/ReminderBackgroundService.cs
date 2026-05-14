@@ -51,6 +51,8 @@ namespace DentalClinic.Web.Services
             _logger.LogInformation("ReminderBackgroundService stopping.");
         }
 
+        internal Task RunOnceForTestAsync() => ProcessRemindersAsync();
+
         private async Task ProcessRemindersAsync()
         {
             using var scope = _scopeFactory.CreateScope();

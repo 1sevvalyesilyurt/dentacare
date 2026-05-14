@@ -48,6 +48,8 @@ namespace DentalClinic.Web.Services
             _logger.LogInformation("NotificationCleanupService stopping.");
         }
 
+        internal Task RunOnceForTestAsync() => CleanupAsync();
+
         private async Task CleanupAsync()
         {
             using var scope = _scopeFactory.CreateScope();
@@ -55,13 +57,17 @@ namespace DentalClinic.Web.Services
 
             var cutoff = DateTime.UtcNow - RetentionAge;
 
-            var deleted = await db.Notifications
+            var stale = await db.Notifications
                 .Where(n => n.IsRead && n.CreatedAt < cutoff)
-                .ExecuteDeleteAsync();
+                .ToListAsync();
 
-            if (deleted > 0)
-                _logger.LogInformation(
-                    "NotificationCleanupService: deleted {Count} old notifications.", deleted);
+            if (stale.Count == 0) return;
+
+            db.Notifications.RemoveRange(stale);
+            await db.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "NotificationCleanupService: deleted {Count} old notifications.", stale.Count);
         }
     }
 }
