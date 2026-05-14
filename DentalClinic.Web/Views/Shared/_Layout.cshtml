@@ -93,6 +93,11 @@
                             <i class="bi bi-clock-history me-1"></i>History
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="Customer" asp-action="PaymentHistory">
+                            <i class="bi bi-receipt me-1"></i>Payments
+                        </a>
+                    </li>
                 }
             </ul>
 
@@ -121,6 +126,15 @@
                             <li><h6 class="dropdown-header">Signed in as</h6></li>
                             <li><span class="dropdown-item-text text-muted small">@User.Identity.Name</span></li>
                             <li><hr class="dropdown-divider" /></li>
+                            @if (User.IsInRole("Customer"))
+                            {
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Customer" asp-action="EditProfile">
+                                        <i class="bi bi-person-gear me-2"></i>Edit Profile
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                            }
                             <li>
                                 <form asp-controller="Account" asp-action="Logout" method="post">
                                     @Html.AntiForgeryToken()

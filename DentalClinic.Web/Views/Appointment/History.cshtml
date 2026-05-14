@@ -1,0 +1,148 @@
+@model List<DentalClinic.Web.Models.Appointment>
+@using DentalClinic.Web.Models
+@{
+    ViewData["Title"] = "Visit History";
+}
+
+<div class="container-fluid px-4">
+
+    <!-- Page Header -->
+    <div class="dc-page-header d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+            <h1>
+                <i class="bi bi-clock-history text-teal me-2"></i>
+                Visit History
+            </h1>
+            <p class="text-muted small mb-0">Past appointments &amp; payment details</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Customer" asp-action="PaymentHistory" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-receipt me-1"></i>All Payments
+            </a>
+            <a asp-controller="Appointment" asp-action="Book" class="btn btn-dc-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i>Book New
+            </a>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="dc-card p-5 text-center">
+            <i class="bi bi-calendar-x" style="font-size:3rem;color:var(--dc-muted);"></i>
+            <h5 class="mt-3 fw-600">No past visits yet</h5>
+            <p class="text-muted">Your completed and cancelled appointments will appear here.</p>
+            <a asp-action="Book" class="btn btn-dc-primary mt-2">Book Your First Appointment</a>
+        </div>
+    }
+    else
+    {
+        <div class="dc-card">
+            <div class="dc-card-header d-flex align-items-center gap-2">
+                <i class="bi bi-list-ul text-teal"></i>
+                <h5 class="mb-0 fw-600">@Model.Count Past Visits</h5>
+            </div>
+            <div class="p-3">
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var appt in Model)
+                    {
+                        var hasPayment = appt.Payment != null;
+                        var isCancelled = appt.Status == AppointmentStatus.Cancelled;
+
+                        <div class="dc-card p-3" style="background:var(--dc-navy);">
+                            <div class="row align-items-center g-3">
+
+                                <!-- Date column -->
+                                <div class="col-auto text-center" style="min-width:72px;">
+                                    <div style="background:rgba(0,188,168,0.12);border:1px solid rgba(0,188,168,0.2);
+                                                border-radius:10px;padding:.6rem .8rem;">
+                                        <div class="fw-700 text-teal" style="font-size:1.4rem;line-height:1;">
+                                            @appt.AppointmentDate.ToString("dd")
+                                        </div>
+                                        <div class="text-muted" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;">
+                                            @appt.AppointmentDate.ToString("MMM")
+                                        </div>
+                                        <div class="text-muted" style="font-size:.65rem;">
+                                            @appt.AppointmentDate.ToString("yyyy")
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Info column -->
+                                <div class="col">
+                                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                                        @{
+                                            var badgeClass = appt.Status switch
+                                            {
+                                                AppointmentStatus.Completed => "badge-confirmed",
+                                                AppointmentStatus.Cancelled => "badge-cancelled",
+                                                _                           => "badge-pending"
+                                            };
+                                        }
+                                        <span class="@badgeClass">@appt.Status</span>
+                                        <span class="text-muted small">
+                                            <i class="bi bi-clock me-1"></i>@appt.AppointmentDate.ToString("HH:mm")
+                                        </span>
+                                    </div>
+                                    <div class="fw-600 mb-1">Dr. @appt.Doctor?.User?.FullName
+                                        <span class="text-muted small fw-400"> · @appt.Doctor?.Specialty</span>
+                                    </div>
+                                    <div class="text-muted small">
+                                        <i class="bi bi-bandaid me-1"></i>@appt.Service?.Name
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(appt.PatientNote))
+                                    {
+                                        <div class="text-muted small fst-italic mt-1">
+                                            <i class="bi bi-chat-left-text me-1"></i>"@appt.PatientNote"
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Payment column -->
+                                <div class="col-auto text-end">
+                                    <div class="fw-700 text-teal fs-5">₺@appt.Fee.ToString("N0")</div>
+                                    @if (hasPayment)
+                                    {
+                                        <div class="small mt-1">
+                                            @{
+                                                var pmIcon = appt.Payment!.PaymentMethod switch
+                                                {
+                                                    PaymentMethod.CreditCard   => "bi-credit-card",
+                                                    PaymentMethod.BankTransfer => "bi-bank",
+                                                    _                           => "bi-cash"
+                                                };
+                                            }
+                                            <span style="color:var(--dc-success);">
+                                                <i class="bi bi-check-circle-fill me-1"></i>Paid
+                                            </span>
+                                        </div>
+                                        <div class="text-muted" style="font-size:.7rem;">
+                                            <i class="bi @pmIcon me-1"></i>
+                                            @appt.Payment!.PaymentMethod
+                                            · @appt.Payment.PaidAt.ToString("dd MMM")
+                                        </div>
+                                        <div class="text-muted" style="font-size:.65rem;font-family:monospace;">
+                                            @appt.Payment.InvoiceNumber
+                                        </div>
+                                    }
+                                    else if (!isCancelled)
+                                    {
+                                        <div class="small mt-1" style="color:var(--dc-amber);">
+                                            <i class="bi bi-hourglass-split me-1"></i>Payment pending
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="small mt-1 text-muted">
+                                            <i class="bi bi-x-circle me-1"></i>Cancelled
+                                        </div>
+                                    }
+                                </div>
+
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>

@@ -1,0 +1,133 @@
+@model List<DentalClinic.Web.Models.Payment>
+@using DentalClinic.Web.Models
+@{
+    ViewData["Title"] = "Payment History";
+}
+
+<div class="container-fluid px-4">
+
+    <!-- Page Header -->
+    <div class="dc-page-header d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+            <h1>
+                <i class="bi bi-receipt text-teal me-2"></i>
+                Payment History
+            </h1>
+            <p class="text-muted small mb-0">@ViewBag.PatientName — all your recorded payments</p>
+        </div>
+        <a asp-controller="Customer" asp-action="Dashboard" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Summary Card -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon amber"><i class="bi bi-wallet2"></i></div>
+                <div>
+                    <div class="dc-stat-value">₺@((decimal)ViewBag.TotalSpent).ToString("N0")</div>
+                    <div class="dc-stat-label">Total Paid</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon teal"><i class="bi bi-file-earmark-text"></i></div>
+                <div>
+                    <div class="dc-stat-value">@Model.Count</div>
+                    <div class="dc-stat-label">Invoices</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon green"><i class="bi bi-check-circle"></i></div>
+                <div>
+                    <div class="dc-stat-value">
+                        @(Model.Count > 0
+                            ? (decimal.Divide(Model.Sum(p => p.Amount), Model.Count)).ToString("N0")
+                            : "0") ₺
+                    </div>
+                    <div class="dc-stat-label">Avg. per Visit</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Table -->
+    <div class="dc-card">
+        <div class="dc-card-header d-flex align-items-center gap-2">
+            <i class="bi bi-table text-teal"></i>
+            <h5 class="mb-0 fw-600">All Payments</h5>
+        </div>
+
+        @if (!Model.Any())
+        {
+            <div class="p-5 text-center">
+                <i class="bi bi-cash-coin" style="font-size:2.5rem;color:var(--dc-muted);"></i>
+                <p class="text-muted mt-3 mb-0">No payments recorded yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="p-3">
+                <div class="table-responsive">
+                    <table class="table table-hover dc-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>Date</th>
+                                <th>Doctor</th>
+                                <th>Service</th>
+                                <th>Method</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="badge-confirmed" style="font-family:monospace;font-size:.75rem;">
+                                            @p.InvoiceNumber
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-600">@p.PaidAt.ToString("dd MMM yyyy")</div>
+                                        <div class="text-muted small">@p.PaidAt.ToString("HH:mm")</div>
+                                    </td>
+                                    <td>Dr. @p.Appointment?.Doctor?.User?.FullName</td>
+                                    <td>@p.Appointment?.Service?.Name</td>
+                                    <td>
+                                        @{
+                                            var (icon, label) = p.PaymentMethod switch
+                                            {
+                                                PaymentMethod.CreditCard  => ("bi-credit-card", "Credit Card"),
+                                                PaymentMethod.BankTransfer => ("bi-bank", "Bank Transfer"),
+                                                _                          => ("bi-cash", "Cash")
+                                            };
+                                        }
+                                        <span class="d-flex align-items-center gap-1">
+                                            <i class="bi @icon text-teal"></i>
+                                            <span class="small">@label</span>
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-700 text-teal">₺@p.Amount.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr style="border-top:2px solid var(--dc-border);">
+                                <td colspan="5" class="fw-700 text-end">Total</td>
+                                <td class="text-end fw-700 fs-5" style="color:var(--dc-amber);">
+                                    ₺@Model.Sum(p => p.Amount).ToString("N0")
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+</div>
