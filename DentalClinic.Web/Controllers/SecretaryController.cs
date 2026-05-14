@@ -61,12 +61,22 @@ namespace DentalClinic.Web.Controllers
         }
 
         // GET /Secretary/Calendar — All-doctors calendar (UC-S03)
-        public IActionResult Calendar(DateTime? date)
+        public async Task<IActionResult> Calendar(DateTime? date)
         {
-            // Calendar view file does not exist yet in this branch.
-            // Temporary fallback to avoid runtime view resolution errors.
-            TempData["ErrorMessage"] = "Calendar page is not implemented yet. Redirected to dashboard.";
-            return RedirectToAction(nameof(Dashboard));
+            var target = date?.Date ?? DateTime.Today;
+            var appointments = await _db.Appointments
+                .Include(a => a.Customer!.User)
+                .Include(a => a.Doctor!.User)
+                .Include(a => a.Service)
+                .Include(a => a.Payment)
+                .Where(a => a.AppointmentDate.Date == target
+                         && a.Status != AppointmentStatus.Cancelled)
+                .OrderBy(a => a.AppointmentDate)
+                .ThenBy(a => a.Doctor!.User!.FullName)
+                .ToListAsync();
+
+            ViewBag.SelectedDate = target;
+            return View(appointments);
         }
 
         // GET /Secretary/CreateAppointment — Manual booking form (UC-S04)
