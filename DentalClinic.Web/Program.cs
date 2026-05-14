@@ -90,7 +90,7 @@ using (var scope = app.Services.CreateScope())
         var db = services.GetRequiredService<AppDbContext>();
         db.Database.Migrate(); // Apply any pending EF migrations
 
-        await SeedDataAsync(services);
+        await SeedDataAsync(services, builder.Configuration);
     }
     catch (Exception ex)
     {
@@ -104,7 +104,7 @@ app.Run();
 // ═══════════════════════════════════════════════════════════════════════════
 // Seed Roles + Default Secretary Account
 // ═══════════════════════════════════════════════════════════════════════════
-static async Task SeedDataAsync(IServiceProvider services)
+static async Task SeedDataAsync(IServiceProvider services, IConfiguration configuration)
 {
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
@@ -122,6 +122,9 @@ static async Task SeedDataAsync(IServiceProvider services)
     const string secretaryEmail = "secretary@dentacare.com";
     if (await userManager.FindByEmailAsync(secretaryEmail) == null)
     {
+        var secretaryPassword = configuration["SeedSettings:DefaultSecretaryPassword"]
+            ?? throw new InvalidOperationException("SeedSettings:DefaultSecretaryPassword is not configured.");
+
         var secretary = new ApplicationUser
         {
             UserName   = secretaryEmail,
@@ -131,7 +134,7 @@ static async Task SeedDataAsync(IServiceProvider services)
             CreatedAt  = DateTime.UtcNow,
             EmailConfirmed = true
         };
-        await userManager.CreateAsync(secretary, "Admin@123");
+        await userManager.CreateAsync(secretary, secretaryPassword);
         await userManager.AddToRoleAsync(secretary, "Secretary");
     }
 

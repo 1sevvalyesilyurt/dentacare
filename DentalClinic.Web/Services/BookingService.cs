@@ -106,7 +106,7 @@ namespace DentalClinic.Web.Services
         }
 
         /// <inheritdoc/>
-        public async Task<bool> CancelAppointmentAsync(int appointmentId, string userId)
+        public async Task<bool> CancelAppointmentAsync(int appointmentId, string userId, bool isSecretary = false)
         {
             var appointment = await _db.Appointments
                 .Include(a => a.Customer)
@@ -119,9 +119,8 @@ namespace DentalClinic.Web.Services
                 appointment.Status != AppointmentStatus.Confirmed)
                 return false;
 
-            // Authorization: customer can only cancel their own appointment
+            // Customers can only cancel their own appointment; secretaries can cancel any
             bool isOwner = appointment.Customer?.UserId == userId;
-            bool isSecretary = true; // Secretary access is checked via [Authorize(Roles="Secretary")] at controller level
             if (!isOwner && !isSecretary) return false;
 
             appointment.Status = AppointmentStatus.Cancelled;

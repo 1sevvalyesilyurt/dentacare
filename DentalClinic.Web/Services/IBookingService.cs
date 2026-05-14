@@ -19,8 +19,9 @@ namespace DentalClinic.Web.Services
 
         /// <summary>
         /// Cancels an appointment. Only Pending/Confirmed appointments can be cancelled (BR-02).
+        /// Pass isSecretary=true only when called from a Secretary-authorized controller action.
         /// </summary>
-        Task<bool> CancelAppointmentAsync(int appointmentId, string requestingUserId);
+        Task<bool> CancelAppointmentAsync(int appointmentId, string requestingUserId, bool isSecretary = false);
 
         /// <summary>
         /// Marks an appointment as Completed. Used by the Doctor.

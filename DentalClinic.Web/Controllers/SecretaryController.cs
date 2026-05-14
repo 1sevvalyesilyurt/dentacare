@@ -117,7 +117,7 @@ namespace DentalClinic.Web.Controllers
         public async Task<IActionResult> CancelAppointment(int id)
         {
             var secretary = await _userManager.GetUserAsync(User);
-            await _bookingService.CancelAppointmentAsync(id, secretary!.Id);
+            await _bookingService.CancelAppointmentAsync(id, secretary!.Id, isSecretary: true);
             TempData["SuccessMessage"] = "Appointment cancelled.";
             return RedirectToAction(nameof(Calendar));
         }

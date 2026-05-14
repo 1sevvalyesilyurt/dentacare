@@ -133,10 +133,15 @@ namespace DentalClinic.Web.Controllers
         // GET /Appointment/Confirmed/{id}
         public async Task<IActionResult> Confirmed(int id)
         {
+            var user = await _userManager.GetUserAsync(User);
+            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id);
+            if (customer == null) return NotFound();
+
             var appointment = await _db.Appointments
                 .Include(a => a.Doctor!.User)
                 .Include(a => a.Service)
-                .FirstOrDefaultAsync(a => a.AppointmentId == id);
+                .FirstOrDefaultAsync(a => a.AppointmentId == id
+                                       && a.CustomerId == customer.CustomerId);
 
             if (appointment == null) return NotFound();
             return View(appointment);
@@ -169,7 +174,7 @@ namespace DentalClinic.Web.Controllers
         public async Task<IActionResult> Cancel(int id)
         {
             var user = await _userManager.GetUserAsync(User);
-            var success = await _bookingService.CancelAppointmentAsync(id, user!.Id);
+            var success = await _bookingService.CancelAppointmentAsync(id, user!.Id, isSecretary: false);
 
             TempData[success ? "SuccessMessage" : "ErrorMessage"] =
                 success ? "Appointment cancelled successfully." : "This appointment cannot be cancelled.";
