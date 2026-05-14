@@ -50,7 +50,12 @@ namespace DentalClinic.Web.Services
 
             if (isOnLeave) return new List<DateTime>();
 
-            return slots.Where(s => !bookedTimes.Contains(s)).ToList();
+            // For today, exclude slots that have already passed
+            var now = DateTime.UtcNow;
+            return slots
+                .Where(s => !bookedTimes.Contains(s))
+                .Where(s => s > now)
+                .ToList();
         }
 
         /// <inheritdoc/>

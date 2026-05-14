@@ -50,8 +50,9 @@ builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
-// ─── Background Service (Reminder Notifications - UC-SYS01) ───────────────
+// ─── Background Services ──────────────────────────────────────────────────
 builder.Services.AddHostedService<ReminderBackgroundService>();
+builder.Services.AddHostedService<NotificationCleanupService>();
 
 // ─── Rate Limiting (per client IP) ───────────────────────────────────────
 builder.Services.AddRateLimiter(options =>
@@ -85,6 +86,10 @@ builder.Services.AddRateLimiter(options =>
 
     options.RejectionStatusCode = 429;
 });
+
+// ─── Health Checks ────────────────────────────────────────────────────────
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database");
 
 // ─── MVC ──────────────────────────────────────────────────────────────────
 builder.Services.AddControllersWithViews();
@@ -130,6 +135,8 @@ app.UseRateLimiter();
 
 app.UseAuthentication(); // Must come before UseAuthorization
 app.UseAuthorization();
+
+app.MapHealthChecks("/health");
 
 app.MapControllerRoute(
     name: "default",
