@@ -48,12 +48,9 @@ namespace DentalClinic.Web.Controllers
                 .OrderBy(a => a.AppointmentDate)
                 .ToListAsync();
 
-            // Mark unread notifications as read when user opens the page
-            var unread = await _db.Notifications
-                .Where(n => n.CustomerId == customer.CustomerId && !n.IsRead)
-                .ToListAsync();
-            unread.ForEach(n => n.IsRead = true);
-            await _db.SaveChangesAsync();
+            // NOTE: Notifications are marked as read only in NotificationController.All()
+            // so that the navbar badge reflects the true unread count until the user
+            // explicitly visits the Notifications page.
 
             return View(appointments);
         }

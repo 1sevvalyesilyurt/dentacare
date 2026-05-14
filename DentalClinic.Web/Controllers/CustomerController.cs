@@ -118,7 +118,27 @@ namespace DentalClinic.Web.Controllers
             var user = await _userManager.GetUserAsync(User);
             if (user == null) return RedirectToAction("Login", "Account");
 
-            // ── Update personal info ──────────────────────────────────────────
+            bool wantsPasswordChange = !string.IsNullOrWhiteSpace(model.CurrentPassword)
+                                    || !string.IsNullOrWhiteSpace(model.NewPassword)
+                                    || !string.IsNullOrWhiteSpace(model.ConfirmNewPassword);
+
+            // ── 1. Password change first (fail fast before touching profile) ──
+            if (wantsPasswordChange)
+            {
+                // IValidatableObject already checked all-or-nothing + match,
+                // so here we just attempt the actual change.
+                var pwResult = await _userManager.ChangePasswordAsync(
+                    user, model.CurrentPassword!, model.NewPassword!);
+
+                if (!pwResult.Succeeded)
+                {
+                    foreach (var e in pwResult.Errors)
+                        ModelState.AddModelError(nameof(model.CurrentPassword), e.Description);
+                    return View(model);
+                }
+            }
+
+            // ── 2. Update personal info only after password succeeds ──────────
             user.FullName    = model.FullName;
             user.PhoneNumber = model.PhoneNumber;
             user.DateOfBirth = model.DateOfBirth;
@@ -129,21 +149,6 @@ namespace DentalClinic.Web.Controllers
                 foreach (var e in updateResult.Errors)
                     ModelState.AddModelError(string.Empty, e.Description);
                 return View(model);
-            }
-
-            // ── Optional password change ──────────────────────────────────────
-            if (!string.IsNullOrWhiteSpace(model.CurrentPassword) &&
-                !string.IsNullOrWhiteSpace(model.NewPassword))
-            {
-                var pwResult = await _userManager.ChangePasswordAsync(
-                    user, model.CurrentPassword, model.NewPassword);
-
-                if (!pwResult.Succeeded)
-                {
-                    foreach (var e in pwResult.Errors)
-                        ModelState.AddModelError(string.Empty, e.Description);
-                    return View(model);
-                }
             }
 
             TempData["SuccessMessage"] = "Your profile has been updated successfully.";

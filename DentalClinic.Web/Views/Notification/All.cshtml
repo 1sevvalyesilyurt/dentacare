@@ -1,0 +1,110 @@
+@model List<DentalClinic.Web.Models.Notification>
+@{
+    ViewData["Title"] = "My Notifications";
+    var unreadCount = Model.Count(n => !n.IsRead);
+}
+
+<div class="container-fluid px-4">
+
+    <!-- Page Header -->
+    <div class="dc-page-header d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+            <h1>
+                <i class="bi bi-bell-fill text-teal me-2"></i>
+                Notifications
+                @if (unreadCount > 0)
+                {
+                    <span class="badge rounded-pill ms-2"
+                          style="background:var(--dc-danger);font-size:.6rem;vertical-align:middle;">
+                        @unreadCount new
+                    </span>
+                }
+            </h1>
+            <p class="text-muted small mb-0">@Model.Count total · @unreadCount unread</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Customer" asp-action="Dashboard" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-grid-1x2 me-1"></i>Dashboard
+            </a>
+            <a asp-controller="Appointment" asp-action="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-calendar-check me-1"></i>My Appointments
+            </a>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <!-- Empty State -->
+        <div class="dc-card p-5 text-center">
+            <i class="bi bi-bell-slash" style="font-size:3rem;color:var(--dc-muted);"></i>
+            <h5 class="mt-3 fw-600">No notifications yet</h5>
+            <p class="text-muted">You'll receive reminders here before your appointments.</p>
+            <a asp-controller="Appointment" asp-action="Book" class="btn btn-dc-primary mt-2">
+                <i class="bi bi-plus-circle me-1"></i>Book an Appointment
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="dc-card">
+            <div class="dc-card-header d-flex align-items-center gap-2">
+                <i class="bi bi-list-ul text-teal"></i>
+                <h5 class="mb-0 fw-600">All Notifications</h5>
+            </div>
+            <div class="p-3">
+                <div class="d-flex flex-column gap-2">
+                    @foreach (var n in Model)
+                    {
+                        <div class="d-flex align-items-start gap-3 p-3"
+                             style="background:@(n.IsRead ? "var(--dc-navy)" : "rgba(0,188,168,0.07)");
+                                    border-radius:10px;
+                                    border:1px solid @(n.IsRead ? "var(--dc-border)" : "rgba(0,188,168,0.25)");
+                                    transition:background .2s;">
+
+                            <!-- Icon -->
+                            <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;
+                                        display:flex;align-items:center;justify-content:center;
+                                        background:@(n.IsRead ? "rgba(255,255,255,0.05)" : "rgba(0,188,168,0.15)");">
+                                @if (n.IsRead)
+                                {
+                                    <i class="bi bi-bell" style="color:var(--dc-muted);font-size:1rem;"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-bell-fill" style="color:var(--dc-teal);font-size:1rem;"></i>
+                                }
+                            </div>
+
+                            <!-- Content -->
+                            <div class="flex-grow-1">
+                                <div class="@(n.IsRead ? "text-muted" : "fw-600")" style="font-size:.9rem;">
+                                    @n.Message
+                                </div>
+                                <div class="text-muted small mt-1">
+                                    <i class="bi bi-clock me-1"></i>
+                                    @n.CreatedAt.ToLocalTime().ToString("dd MMM yyyy · HH:mm")
+                                </div>
+                            </div>
+
+                            <!-- Read badge -->
+                            <div class="flex-shrink-0">
+                                @if (!n.IsRead)
+                                {
+                                    <span class="badge rounded-pill"
+                                          style="background:rgba(0,188,168,0.15);color:var(--dc-teal);
+                                                 border:1px solid rgba(0,188,168,0.3);font-size:.65rem;">
+                                        New
+                                    </span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check2-all" style="color:var(--dc-muted);font-size:1rem;" title="Read"></i>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
