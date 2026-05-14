@@ -2,7 +2,9 @@ using DentalClinic.Web.Data;
 using DentalClinic.Web.Models;
 using DentalClinic.Web.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,12 +21,12 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     // Password settings
     options.Password.RequireDigit           = true;
-    options.Password.RequiredLength         = 6;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase       = false;
+    options.Password.RequiredLength         = 8;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequireUppercase       = true;
 
     // Lockout settings
-    options.Lockout.DefaultLockoutTimeSpan  = TimeSpan.FromMinutes(5);
+    options.Lockout.DefaultLockoutTimeSpan  = TimeSpan.FromMinutes(15);
     options.Lockout.MaxFailedAccessAttempts = 5;
 
     // User settings
@@ -39,16 +41,41 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath         = "/Account/Login";
     options.LogoutPath        = "/Account/Logout";
     options.AccessDeniedPath  = "/Account/AccessDenied";
-    options.ExpireTimeSpan    = TimeSpan.FromDays(7);
+    options.ExpireTimeSpan    = TimeSpan.FromHours(8);
     options.SlidingExpiration = true;
 });
 
 // ─── Application Services ─────────────────────────────────────────────────
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // ─── Background Service (Reminder Notifications - UC-SYS01) ───────────────
 builder.Services.AddHostedService<ReminderBackgroundService>();
+
+// ─── Rate Limiting ────────────────────────────────────────────────────────
+builder.Services.AddRateLimiter(options =>
+{
+    // Login endpoint: max 10 attempts per minute per IP
+    options.AddFixedWindowLimiter("login", o =>
+    {
+        o.Window            = TimeSpan.FromMinutes(1);
+        o.PermitLimit       = 10;
+        o.QueueLimit        = 0;
+        o.AutoReplenishment = true;
+    });
+
+    // Register endpoint: max 5 per minute per IP
+    options.AddFixedWindowLimiter("register", o =>
+    {
+        o.Window            = TimeSpan.FromMinutes(1);
+        o.PermitLimit       = 5;
+        o.QueueLimit        = 0;
+        o.AutoReplenishment = true;
+    });
+
+    options.RejectionStatusCode = 429;
+});
 
 // ─── MVC ──────────────────────────────────────────────────────────────────
 builder.Services.AddControllersWithViews();
@@ -69,8 +96,28 @@ else
 }
 
 app.UseHttpsRedirection();
+
+// ─── Security Headers ─────────────────────────────────────────────────────
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    context.Response.Headers.Append(
+        "Content-Security-Policy",
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; " +
+        "font-src 'self';");
+    await next();
+});
+
 app.UseStaticFiles();
 app.UseRouting();
+app.UseRateLimiter();
 
 app.UseAuthentication(); // Must come before UseAuthorization
 app.UseAuthorization();

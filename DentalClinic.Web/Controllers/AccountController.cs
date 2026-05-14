@@ -3,6 +3,7 @@ using DentalClinic.Web.Models;
 using DentalClinic.Web.ViewModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace DentalClinic.Web.Controllers
@@ -43,6 +44,7 @@ namespace DentalClinic.Web.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> SecretaryLogin(LoginViewModel model)
         {
             if (!ModelState.IsValid) return View(model);
@@ -61,6 +63,7 @@ namespace DentalClinic.Web.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> DoctorLogin(LoginViewModel model)
         {
             if (!ModelState.IsValid) return View(model);
@@ -80,6 +83,7 @@ namespace DentalClinic.Web.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
             if (!ModelState.IsValid) return View(model);
@@ -98,6 +102,7 @@ namespace DentalClinic.Web.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
+        [EnableRateLimiting("register")]
         public async Task<IActionResult> Register(RegisterViewModel model)
         {
             if (!ModelState.IsValid) return View(model);

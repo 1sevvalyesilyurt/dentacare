@@ -54,15 +54,16 @@ namespace DentalClinic.Web.Services
         private async Task ProcessRemindersAsync()
         {
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var db           = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
 
-            var now = DateTime.UtcNow;
+            var now    = DateTime.UtcNow;
             var cutoff = now.AddHours(24);
 
-            // Find confirmed appointments in the next 24h that haven't been reminded yet
             var upcomingAppointments = await db.Appointments
-                .Include(a => a.Customer)
+                .Include(a => a.Customer!.User)
                 .Include(a => a.Doctor!.User)
+                .Include(a => a.Service)
                 .Where(a =>
                     a.Status == AppointmentStatus.Confirmed
                     && !a.ReminderSent
@@ -74,26 +75,56 @@ namespace DentalClinic.Web.Services
             {
                 var doctorName = appointment.Doctor?.User?.FullName ?? "your doctor";
                 var timeString = appointment.AppointmentDate.ToLocalTime().ToString("dddd, dd MMM yyyy 'at' HH:mm");
+                var serviceName = appointment.Service?.Name ?? "";
 
-                var notification = new Notification
+                // In-app notification
+                db.Notifications.Add(new Notification
                 {
-                    CustomerId = appointment.CustomerId,
+                    CustomerId    = appointment.CustomerId,
                     AppointmentId = appointment.AppointmentId,
-                    Message = $"⏰ Reminder: You have an appointment with Dr. {doctorName} {timeString}. Please arrive 10 minutes early.",
-                    CreatedAt = DateTime.UtcNow,
-                    IsRead = false
-                };
+                    Message       = $"⏰ Reminder: You have an appointment with Dr. {doctorName} {timeString}. Please arrive 10 minutes early.",
+                    CreatedAt     = DateTime.UtcNow,
+                    IsRead        = false
+                });
 
-                db.Notifications.Add(notification);
                 appointment.ReminderSent = true;
 
+                // Email notification
+                var patientEmail = appointment.Customer?.User?.Email;
+                var patientName  = appointment.Customer?.User?.FullName ?? "Patient";
+                if (!string.IsNullOrWhiteSpace(patientEmail))
+                {
+                    var subject = "Appointment Reminder — DentaCare Clinic";
+                    var body    = BuildReminderEmailHtml(patientName, doctorName, serviceName, timeString);
+                    await emailService.SendAsync(patientEmail, subject, body);
+                }
+
                 _logger.LogInformation(
-                    "Reminder created for CustomerId={CustomerId}, AppointmentId={AppointmentId}",
+                    "Reminder sent for CustomerId={CustomerId}, AppointmentId={AppointmentId}",
                     appointment.CustomerId, appointment.AppointmentId);
             }
 
             if (upcomingAppointments.Any())
                 await db.SaveChangesAsync();
         }
+
+        private static string BuildReminderEmailHtml(
+            string patientName, string doctorName, string serviceName, string timeString) => $"""
+            <html><body style="font-family:Arial,sans-serif;color:#222;">
+              <h2 style="color:#0d9488;">DentaCare — Appointment Reminder</h2>
+              <p>Dear <strong>{patientName}</strong>,</p>
+              <p>This is a reminder that you have an upcoming appointment:</p>
+              <table style="border-collapse:collapse;margin:16px 0;">
+                <tr><td style="padding:6px 12px;font-weight:bold;">Doctor</td>
+                    <td style="padding:6px 12px;">Dr. {doctorName}</td></tr>
+                <tr style="background:#f0fdfa;"><td style="padding:6px 12px;font-weight:bold;">Service</td>
+                    <td style="padding:6px 12px;">{serviceName}</td></tr>
+                <tr><td style="padding:6px 12px;font-weight:bold;">Date & Time</td>
+                    <td style="padding:6px 12px;">{timeString}</td></tr>
+              </table>
+              <p>Please arrive <strong>10 minutes early</strong>.</p>
+              <p style="color:#888;font-size:12px;">DentaCare Clinic — This is an automated message.</p>
+            </body></html>
+            """;
     }
 }
