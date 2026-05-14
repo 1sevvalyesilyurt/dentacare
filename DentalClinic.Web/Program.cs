@@ -210,3 +210,5 @@ static async Task SeedDataAsync(IServiceProvider services, IConfiguration config
         await db.SaveChangesAsync();
     }
 }
+
+public partial class Program { }

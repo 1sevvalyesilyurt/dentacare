@@ -20,6 +20,9 @@ namespace DentalClinic.Web.Services
             var doctor = await _db.Doctors.FindAsync(doctorId);
             if (doctor == null) return new List<DateTime>();
 
+            // Guard: misconfigured doctor record would cause infinite loop
+            if (doctor.SlotDurationMinutes <= 0) return new List<DateTime>();
+
             // Generate all possible slots for the given day
             var slots = new List<DateTime>();
             var current = date.Date + doctor.WorkingHoursStart;
@@ -53,14 +56,18 @@ namespace DentalClinic.Web.Services
         /// <inheritdoc/>
         public async Task<Appointment?> CreateAppointmentAsync(BookingViewModel model, string userId)
         {
-            // Resolve customer profile from ApplicationUser.Id
             var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == userId);
             if (customer == null) return null;
 
             var service = await _db.Services.FindAsync(model.ServiceId);
             if (service == null) return null;
 
-            // BR-01: Check for slot conflict at DB level before insert
+            // Server-side slot validation: the requested time must be a real slot
+            // (guards against hidden-field manipulation on the booking form)
+            var validSlots = await GetAvailableSlotsAsync(model.DoctorId, model.AppointmentDate.Date);
+            if (!validSlots.Contains(model.AppointmentDate)) return null;
+
+            // BR-01 pre-check (optimistic; the unique index is the final guard)
             bool slotTaken = await _db.Appointments.AnyAsync(a =>
                 a.DoctorId == model.DoctorId
                 && a.AppointmentDate == model.AppointmentDate
@@ -68,38 +75,37 @@ namespace DentalClinic.Web.Services
 
             if (slotTaken) return null;
 
-            // Check doctor leave
-            bool onLeave = await _db.DoctorLeaves.AnyAsync(l =>
-                l.DoctorId == model.DoctorId
-                && l.StartDate.Date <= model.AppointmentDate.Date
-                && l.EndDate.Date >= model.AppointmentDate.Date);
-
-            if (onLeave) return null;
-
             var appointment = new Appointment
             {
-                CustomerId = customer.CustomerId,
-                DoctorId = model.DoctorId,
-                ServiceId = model.ServiceId,
+                CustomerId      = customer.CustomerId,
+                DoctorId        = model.DoctorId,
+                ServiceId       = model.ServiceId,
                 AppointmentDate = model.AppointmentDate,
-                Status = AppointmentStatus.Confirmed,
-                PatientNote = model.PatientNote,
-                Fee = service.BaseFee,
-                CreatedAt = DateTime.UtcNow
+                Status          = AppointmentStatus.Confirmed,
+                PatientNote     = model.PatientNote,
+                Fee             = service.BaseFee,
+                CreatedAt       = DateTime.UtcNow
             };
 
             _db.Appointments.Add(appointment);
-            await _db.SaveChangesAsync();
 
-            // Create in-app booking confirmation notification
-            var notification = new Notification
+            try
             {
-                CustomerId = customer.CustomerId,
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Unique constraint violation: another request won the race for this slot
+                return null;
+            }
+
+            _db.Notifications.Add(new Notification
+            {
+                CustomerId    = customer.CustomerId,
                 AppointmentId = appointment.AppointmentId,
-                Message = $"Your appointment is confirmed for {appointment.AppointmentDate:dddd, dd MMM yyyy} at {appointment.AppointmentDate:HH:mm}.",
-                CreatedAt = DateTime.UtcNow
-            };
-            _db.Notifications.Add(notification);
+                Message       = $"Your appointment is confirmed for {appointment.AppointmentDate:dddd, dd MMM yyyy} at {appointment.AppointmentDate:HH:mm}.",
+                CreatedAt     = DateTime.UtcNow
+            });
             await _db.SaveChangesAsync();
 
             return appointment;

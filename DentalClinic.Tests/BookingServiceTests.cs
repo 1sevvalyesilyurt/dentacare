@@ -16,6 +16,149 @@ public class BookingServiceTests
         return new AppDbContext(options);
     }
 
+    // ─── GetAvailableSlotsAsync ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetSlots_ValidDoctor_ReturnsExpectedSlots()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, userId: "doc-1", doctorId: 1,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(11), slotMinutes: 30);
+
+        var svc   = new BookingService(db);
+        var slots = await svc.GetAvailableSlotsAsync(1, new DateTime(2026, 6, 1));
+
+        // 09:00, 09:30, 10:00, 10:30 → 4 slots
+        Assert.Equal(4, slots.Count);
+        Assert.Contains(new DateTime(2026, 6, 1, 9, 0, 0), slots);
+        Assert.Contains(new DateTime(2026, 6, 1, 10, 30, 0), slots);
+    }
+
+    [Fact]
+    public async Task GetSlots_DoctorNotFound_ReturnsEmpty()
+    {
+        using var db = CreateDb();
+        var svc   = new BookingService(db);
+        var slots = await svc.GetAvailableSlotsAsync(999, DateTime.Today);
+
+        Assert.Empty(slots);
+    }
+
+    [Fact]
+    public async Task GetSlots_SlotDurationZero_ReturnsEmpty()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, userId: "doc-2", doctorId: 2,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(17), slotMinutes: 0);
+
+        var svc   = new BookingService(db);
+        var slots = await svc.GetAvailableSlotsAsync(2, DateTime.Today);
+
+        Assert.Empty(slots);
+    }
+
+    [Fact]
+    public async Task GetSlots_DoctorOnLeave_ReturnsEmpty()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, userId: "doc-3", doctorId: 3,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(17), slotMinutes: 30);
+
+        var leaveDate = new DateTime(2026, 6, 10);
+        db.DoctorLeaves.Add(new DoctorLeave
+        {
+            DoctorId  = 3,
+            StartDate = leaveDate,
+            EndDate   = leaveDate
+        });
+        await db.SaveChangesAsync();
+
+        var svc   = new BookingService(db);
+        var slots = await svc.GetAvailableSlotsAsync(3, leaveDate);
+
+        Assert.Empty(slots);
+    }
+
+    [Fact]
+    public async Task GetSlots_SomeBooked_ExcludesBookedTimes()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, userId: "doc-4", doctorId: 4,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(11), slotMinutes: 30);
+
+        var date = new DateTime(2026, 6, 15);
+        db.Appointments.Add(new Appointment
+        {
+            CustomerId      = 1,
+            DoctorId        = 4,
+            ServiceId       = 1,
+            AppointmentDate = date.AddHours(9),
+            Status          = AppointmentStatus.Confirmed,
+            Fee             = 200
+        });
+        await db.SaveChangesAsync();
+
+        var svc   = new BookingService(db);
+        var slots = await svc.GetAvailableSlotsAsync(4, date);
+
+        Assert.DoesNotContain(date.AddHours(9), slots);
+        Assert.Contains(date.AddHours(9).AddMinutes(30), slots);
+    }
+
+    [Fact]
+    public async Task GetSlots_AllBooked_ReturnsEmpty()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, userId: "doc-5", doctorId: 5,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(10), slotMinutes: 30);
+
+        var date = new DateTime(2026, 6, 20);
+        foreach (var offset in new[] { 0, 30 })
+        {
+            db.Appointments.Add(new Appointment
+            {
+                CustomerId      = 1,
+                DoctorId        = 5,
+                ServiceId       = 1,
+                AppointmentDate = date.AddHours(9).AddMinutes(offset),
+                Status          = AppointmentStatus.Confirmed,
+                Fee             = 200
+            });
+        }
+        await db.SaveChangesAsync();
+
+        var svc   = new BookingService(db);
+        var slots = await svc.GetAvailableSlotsAsync(5, date);
+
+        Assert.Empty(slots);
+    }
+
+    [Fact]
+    public async Task GetSlots_CancelledAppointments_SlotRemainsAvailable()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, userId: "doc-6", doctorId: 6,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(10), slotMinutes: 30);
+
+        var date = new DateTime(2026, 6, 25);
+        db.Appointments.Add(new Appointment
+        {
+            CustomerId      = 1,
+            DoctorId        = 6,
+            ServiceId       = 1,
+            AppointmentDate = date.AddHours(9),
+            Status          = AppointmentStatus.Cancelled,
+            Fee             = 200
+        });
+        await db.SaveChangesAsync();
+
+        var svc   = new BookingService(db);
+        var slots = await svc.GetAvailableSlotsAsync(6, date);
+
+        // Cancelled appointment must not block the slot
+        Assert.Contains(date.AddHours(9), slots);
+    }
+
     // ─── CreateAppointmentAsync ───────────────────────────────────────────────
 
     [Fact]
@@ -231,7 +374,13 @@ public class BookingServiceTests
 
     // ─── Seed helpers ─────────────────────────────────────────────────────────
 
-    private static void SeedDoctor(AppDbContext db, string userId, int doctorId)
+    private static void SeedDoctor(
+        AppDbContext db,
+        string userId,
+        int doctorId,
+        TimeSpan? start       = null,
+        TimeSpan? end         = null,
+        int slotMinutes       = 30)
     {
         db.Users.Add(new ApplicationUser { Id = userId, UserName = userId, Email = $"{userId}@test.com", FullName = "Test Doctor" });
         db.Doctors.Add(new Doctor
@@ -240,9 +389,9 @@ public class BookingServiceTests
             UserId              = userId,
             Specialty           = "General",
             CommissionRate      = 0.70m,
-            WorkingHoursStart   = TimeSpan.FromHours(9),
-            WorkingHoursEnd     = TimeSpan.FromHours(17),
-            SlotDurationMinutes = 30
+            WorkingHoursStart   = start ?? TimeSpan.FromHours(9),
+            WorkingHoursEnd     = end   ?? TimeSpan.FromHours(17),
+            SlotDurationMinutes = slotMinutes
         });
         db.SaveChanges();
     }
