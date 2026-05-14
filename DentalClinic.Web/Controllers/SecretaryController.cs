@@ -58,21 +58,12 @@ namespace DentalClinic.Web.Controllers
         }
 
         // GET /Secretary/Calendar — All-doctors calendar (UC-S03)
-        public async Task<IActionResult> Calendar(DateTime? date)
+        public IActionResult Calendar(DateTime? date)
         {
-            var target = date ?? DateTime.Today;
-            var appointments = await _db.Appointments
-                .Include(a => a.Customer!.User)
-                .Include(a => a.Doctor!.User)
-                .Include(a => a.Service)
-                .Where(a => a.AppointmentDate.Date == target.Date
-                         && a.Status != AppointmentStatus.Cancelled)
-                .OrderBy(a => a.DoctorId)
-                .ThenBy(a => a.AppointmentDate)
-                .ToListAsync();
-
-            ViewBag.SelectedDate = target;
-            return View(appointments);
+            // Calendar view file does not exist yet in this branch.
+            // Temporary fallback to avoid runtime view resolution errors.
+            TempData["ErrorMessage"] = "Calendar page is not implemented yet. Redirected to dashboard.";
+            return RedirectToAction(nameof(Dashboard));
         }
 
         // GET /Secretary/CreateAppointment — Manual booking form (UC-S04)
@@ -120,6 +111,65 @@ namespace DentalClinic.Web.Controllers
             await _bookingService.CancelAppointmentAsync(id, secretary!.Id);
             TempData["SuccessMessage"] = "Appointment cancelled.";
             return RedirectToAction(nameof(Calendar));
+        }
+
+        // GET /Secretary/RescheduleAppointment/{id} (UC-S05)
+        [HttpGet]
+        public async Task<IActionResult> RescheduleAppointment(int id)
+        {
+            var vm = new RescheduleAppointmentViewModel { AppointmentId = id };
+            var loaded = await PopulateRescheduleContextAsync(vm);
+            if (!loaded) return NotFound();
+            return View(vm);
+        }
+
+        // POST /Secretary/RescheduleAppointment (UC-S05)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RescheduleAppointment(RescheduleAppointmentViewModel model)
+        {
+            var loaded = await PopulateRescheduleContextAsync(model);
+            if (!loaded) return NotFound();
+
+            if (!TimeSpan.TryParse(model.NewTime, out var slotTime))
+                ModelState.AddModelError(nameof(model.NewTime), "Please select a valid time slot.");
+
+            if (!ModelState.IsValid) return View(model);
+
+            var newDateTime = model.NewDate.Date + slotTime;
+            var success = await _bookingService.RescheduleAppointmentAsync(model.AppointmentId, newDateTime);
+
+            if (!success)
+            {
+                ModelState.AddModelError(string.Empty, "Reschedule failed. The slot may be unavailable or invalid.");
+                await PopulateRescheduleContextAsync(model);
+                return View(model);
+            }
+
+            TempData["SuccessMessage"] = $"Appointment moved to {newDateTime:dddd, dd MMM yyyy HH:mm}.";
+            return RedirectToAction(nameof(Dashboard));
+        }
+
+        // GET /Secretary/AvailableSlots?doctorId=1&date=2026-05-10&appointmentId=12
+        [HttpGet]
+        public async Task<IActionResult> AvailableSlots(int doctorId, DateTime date, int? appointmentId = null)
+        {
+            var slots = await _bookingService.GetAvailableSlotsAsync(doctorId, date);
+            var slotTimes = slots.Select(s => s.ToString("HH:mm")).ToList();
+
+            // Keep the current appointment time selectable when rescheduling the same record.
+            if (appointmentId.HasValue)
+            {
+                var appt = await _db.Appointments.FirstOrDefaultAsync(a => a.AppointmentId == appointmentId.Value);
+                if (appt != null && appt.DoctorId == doctorId && appt.AppointmentDate.Date == date.Date)
+                {
+                    var current = appt.AppointmentDate.ToString("HH:mm");
+                    if (!slotTimes.Contains(current))
+                        slotTimes.Add(current);
+                }
+            }
+
+            return Json(slotTimes.OrderBy(t => t));
         }
 
         // GET /Secretary/Payments — Revenue dashboard (UC-S08)
@@ -337,7 +387,147 @@ namespace DentalClinic.Web.Controllers
             return RedirectToAction(nameof(Doctors));
         }
 
+        // ─── Doctor Leave Management (UC-S02 extension) ──────────────────────────
+
+        // GET /Secretary/DoctorLeaves — List all leave records
+        [HttpGet]
+        public async Task<IActionResult> DoctorLeaves()
+        {
+            var leaves = await _db.DoctorLeaves
+                .Include(l => l.Doctor!)
+                    .ThenInclude(d => d.User)
+                .OrderByDescending(l => l.StartDate)
+                .ToListAsync();
+
+            return View(leaves);
+        }
+
+        // GET /Secretary/AddLeave/{doctorId} — Create leave form
+        [HttpGet]
+        public async Task<IActionResult> AddLeave(int doctorId)
+        {
+            var doctor = await _db.Doctors
+                .Include(d => d.User)
+                .FirstOrDefaultAsync(d => d.DoctorId == doctorId);
+
+            if (doctor == null)
+            {
+                TempData["ErrorMessage"] = "Doctor not found.";
+                return RedirectToAction(nameof(Doctors));
+            }
+
+            ViewBag.Doctor = doctor;
+            return View(new DoctorLeave
+            {
+                DoctorId = doctorId,
+                StartDate = DateTime.Today,
+                EndDate = DateTime.Today
+            });
+        }
+
+        // POST /Secretary/AddLeave — Save leave
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddLeave(DoctorLeave model)
+        {
+            var doctor = await _db.Doctors
+                .Include(d => d.User)
+                .FirstOrDefaultAsync(d => d.DoctorId == model.DoctorId);
+
+            if (doctor == null)
+            {
+                TempData["ErrorMessage"] = "Doctor not found.";
+                return RedirectToAction(nameof(Doctors));
+            }
+
+            if (model.StartDate.Date > model.EndDate.Date)
+                ModelState.AddModelError(string.Empty, "Start date cannot be later than end date.");
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Doctor = doctor;
+                return View(model);
+            }
+
+            _db.DoctorLeaves.Add(new DoctorLeave
+            {
+                DoctorId = model.DoctorId,
+                StartDate = model.StartDate.Date,
+                EndDate = model.EndDate.Date,
+                Reason = model.Reason
+            });
+
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Leave added for Dr. {doctor.User?.FullName}.";
+            return RedirectToAction(nameof(DoctorLeaves));
+        }
+
+        // POST /Secretary/DeleteLeave/{id} — Delete leave record
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteLeave(int id)
+        {
+            var leave = await _db.DoctorLeaves
+                .Include(l => l.Doctor!)
+                    .ThenInclude(d => d.User)
+                .FirstOrDefaultAsync(l => l.LeaveId == id);
+
+            if (leave == null)
+            {
+                TempData["ErrorMessage"] = "Leave record not found.";
+                return RedirectToAction(nameof(DoctorLeaves));
+            }
+
+            var doctorName = leave.Doctor?.User?.FullName ?? "Doctor";
+            _db.DoctorLeaves.Remove(leave);
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Leave deleted for Dr. {doctorName}.";
+            return RedirectToAction(nameof(DoctorLeaves));
+        }
+
         // ─── Helpers ───────────────────────────────────────────────────────────────
+        private async Task<bool> PopulateRescheduleContextAsync(RescheduleAppointmentViewModel model)
+        {
+            var appt = await _db.Appointments
+                .Include(a => a.Customer!.User)
+                .Include(a => a.Doctor!.User)
+                .Include(a => a.Service)
+                .FirstOrDefaultAsync(a => a.AppointmentId == model.AppointmentId);
+
+            if (appt == null) return false;
+
+            model.DoctorId = appt.DoctorId;
+            model.PatientName = appt.Customer?.User?.FullName ?? "-";
+            model.DoctorName = appt.Doctor?.User?.FullName ?? "-";
+            model.ServiceName = appt.Service?.Name ?? "-";
+            model.CurrentAppointmentDate = appt.AppointmentDate;
+
+            if (model.NewDate == default)
+                model.NewDate = appt.AppointmentDate.Date;
+
+            if (string.IsNullOrWhiteSpace(model.NewTime))
+                model.NewTime = appt.AppointmentDate.ToString("HH:mm");
+
+            var slots = await _bookingService.GetAvailableSlotsAsync(appt.DoctorId, model.NewDate.Date);
+            model.AvailableSlots = slots
+                .Select(s => s.ToString("HH:mm"))
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+
+            // Keep current slot in dropdown for same date.
+            if (model.NewDate.Date == appt.AppointmentDate.Date)
+            {
+                var current = appt.AppointmentDate.ToString("HH:mm");
+                if (!model.AvailableSlots.Contains(current))
+                    model.AvailableSlots.Add(current);
+            }
+
+            model.AvailableSlots = model.AvailableSlots.OrderBy(s => s).ToList();
+            return true;
+        }
+
         private async Task PopulateBookingDropdowns()
         {
             ViewBag.Doctors = await _db.Doctors.Include(d => d.User)

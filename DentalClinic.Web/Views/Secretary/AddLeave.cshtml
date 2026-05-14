@@ -1,0 +1,60 @@
+@model DentalClinic.Web.Models.DoctorLeave
+@{
+    ViewData["Title"] = "Add Doctor Leave";
+    var doctor = ViewBag.Doctor as DentalClinic.Web.Models.Doctor;
+}
+
+<div class="container" style="max-width:720px;">
+    <div class="dc-page-header">
+        <h1><i class="bi bi-calendar-plus text-teal me-2"></i>Add Leave</h1>
+        @if (doctor != null)
+        {
+            <p class="text-muted small mb-0">
+                Dr. @doctor.User?.FullName
+                <span class="mx-1">-</span>
+                @doctor.Specialty
+            </p>
+        }
+    </div>
+
+    <div class="dc-card p-4">
+        <form asp-action="AddLeave" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2" role="alert"></div>
+
+            <input asp-for="DoctorId" type="hidden" />
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="StartDate" class="form-label"></label>
+                    <input asp-for="StartDate" type="date" class="form-control" />
+                    <span asp-validation-for="StartDate" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="EndDate" class="form-label"></label>
+                    <input asp-for="EndDate" type="date" class="form-control" />
+                    <span asp-validation-for="EndDate" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Reason" class="form-label"></label>
+                    <textarea asp-for="Reason" class="form-control" rows="4" placeholder="Optional reason for leave"></textarea>
+                    <span asp-validation-for="Reason" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-dc-primary">
+                    <i class="bi bi-check2-circle me-1"></i>Save Leave
+                </button>
+                <a asp-action="DoctorLeaves" class="btn btn-outline-secondary">Back to Leaves</a>
+                <a asp-action="Doctors" class="btn btn-outline-secondary">Back to Doctors</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

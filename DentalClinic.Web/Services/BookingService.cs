@@ -130,6 +130,65 @@ namespace DentalClinic.Web.Services
         }
 
         /// <inheritdoc/>
+        public async Task<bool> RescheduleAppointmentAsync(int appointmentId, DateTime newAppointmentDate)
+        {
+            var appointment = await _db.Appointments
+                .Include(a => a.Doctor)
+                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId);
+
+            if (appointment == null || appointment.Doctor == null)
+                return false;
+
+            // Only active appointments can be rescheduled
+            if (appointment.Status == AppointmentStatus.Cancelled ||
+                appointment.Status == AppointmentStatus.Completed)
+                return false;
+
+            var doctor = appointment.Doctor;
+            var newTime = newAppointmentDate.TimeOfDay;
+
+            // Must be inside working hours
+            if (newTime < doctor.WorkingHoursStart || newTime >= doctor.WorkingHoursEnd)
+                return false;
+
+            // Must align with doctor's slot interval
+            var minutesFromStart = (newTime - doctor.WorkingHoursStart).TotalMinutes;
+            if (minutesFromStart < 0 || minutesFromStart % doctor.SlotDurationMinutes != 0)
+                return false;
+
+            // Doctor cannot be on leave for target date
+            var onLeave = await _db.DoctorLeaves.AnyAsync(l =>
+                l.DoctorId == appointment.DoctorId &&
+                l.StartDate.Date <= newAppointmentDate.Date &&
+                l.EndDate.Date >= newAppointmentDate.Date);
+            if (onLeave) return false;
+
+            // Slot must be free (excluding this appointment)
+            var slotTaken = await _db.Appointments.AnyAsync(a =>
+                a.AppointmentId != appointment.AppointmentId &&
+                a.DoctorId == appointment.DoctorId &&
+                a.AppointmentDate == newAppointmentDate &&
+                a.Status != AppointmentStatus.Cancelled);
+            if (slotTaken) return false;
+
+            appointment.AppointmentDate = newAppointmentDate;
+            appointment.ReminderSent = false; // Allow reminder service to send for the new time.
+
+            await _db.SaveChangesAsync();
+
+            _db.Notifications.Add(new Notification
+            {
+                CustomerId = appointment.CustomerId,
+                AppointmentId = appointment.AppointmentId,
+                Message = $"Your appointment has been rescheduled to {newAppointmentDate:dddd, dd MMM yyyy} at {newAppointmentDate:HH:mm}.",
+                CreatedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+
+            return true;
+        }
+
+        /// <inheritdoc/>
         public async Task<bool> CompleteAppointmentAsync(int appointmentId, int doctorId)
         {
             var appointment = await _db.Appointments
