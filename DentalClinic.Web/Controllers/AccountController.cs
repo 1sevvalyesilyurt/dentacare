@@ -182,7 +182,11 @@ namespace DentalClinic.Web.Controllers
 
             if (result.Succeeded)
             {
-                _logger.LogInformation("{Role} {Email} logged in.", expectedRole, model.Email);
+                _logger.LogInformation(
+                    "AUDIT Login succeeded. Role={Role} Email={Email} IP={IP}",
+                    expectedRole, model.Email,
+                    HttpContext.Connection.RemoteIpAddress);
+
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                     return Redirect(returnUrl);
                 return RedirectToRoleHome();
@@ -190,9 +194,19 @@ namespace DentalClinic.Web.Controllers
 
             if (result.IsLockedOut)
             {
+                _logger.LogWarning(
+                    "AUDIT Account locked. Role={Role} Email={Email} IP={IP}",
+                    expectedRole, model.Email,
+                    HttpContext.Connection.RemoteIpAddress);
+
                 ModelState.AddModelError(string.Empty, "Account locked. Try again in 5 minutes.");
                 return View(viewName, model);
             }
+
+            _logger.LogWarning(
+                "AUDIT Login failed. Role={Role} Email={Email} IP={IP}",
+                expectedRole, model.Email,
+                HttpContext.Connection.RemoteIpAddress);
 
             ModelState.AddModelError(string.Empty, "Invalid email or password.");
             return View(viewName, model);

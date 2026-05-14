@@ -3,6 +3,7 @@ using DentalClinic.Web.Models;
 using DentalClinic.Web.Services;
 using DentalClinic.Web.ViewModels;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DentalClinic.Tests;
 
@@ -25,7 +26,7 @@ public class BookingServiceTests
         SeedDoctor(db, userId: "doc-1", doctorId: 1,
             start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(11), slotMinutes: 30);
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var slots = await svc.GetAvailableSlotsAsync(1, new DateTime(2026, 6, 1));
 
         // 09:00, 09:30, 10:00, 10:30 → 4 slots
@@ -38,7 +39,7 @@ public class BookingServiceTests
     public async Task GetSlots_DoctorNotFound_ReturnsEmpty()
     {
         using var db = CreateDb();
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var slots = await svc.GetAvailableSlotsAsync(999, DateTime.Today);
 
         Assert.Empty(slots);
@@ -51,7 +52,7 @@ public class BookingServiceTests
         SeedDoctor(db, userId: "doc-2", doctorId: 2,
             start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(17), slotMinutes: 0);
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var slots = await svc.GetAvailableSlotsAsync(2, DateTime.Today);
 
         Assert.Empty(slots);
@@ -73,7 +74,7 @@ public class BookingServiceTests
         });
         await db.SaveChangesAsync();
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var slots = await svc.GetAvailableSlotsAsync(3, leaveDate);
 
         Assert.Empty(slots);
@@ -98,7 +99,7 @@ public class BookingServiceTests
         });
         await db.SaveChangesAsync();
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var slots = await svc.GetAvailableSlotsAsync(4, date);
 
         Assert.DoesNotContain(date.AddHours(9), slots);
@@ -127,7 +128,7 @@ public class BookingServiceTests
         }
         await db.SaveChangesAsync();
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var slots = await svc.GetAvailableSlotsAsync(5, date);
 
         Assert.Empty(slots);
@@ -152,7 +153,7 @@ public class BookingServiceTests
         });
         await db.SaveChangesAsync();
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var slots = await svc.GetAvailableSlotsAsync(6, date);
 
         // Cancelled appointment must not block the slot
@@ -169,7 +170,7 @@ public class BookingServiceTests
         SeedCustomer(db, userId: "user-cust-1", customerId: 1);
         SeedService(db, serviceId: 1);
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var model = new BookingViewModel
         {
             DoctorId        = 1,
@@ -203,7 +204,7 @@ public class BookingServiceTests
         });
         await db.SaveChangesAsync();
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var model = new BookingViewModel
         {
             DoctorId        = 1,
@@ -233,7 +234,7 @@ public class BookingServiceTests
         });
         await db.SaveChangesAsync();
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var model = new BookingViewModel
         {
             DoctorId        = 1,
@@ -252,7 +253,7 @@ public class BookingServiceTests
         using var db = CreateDb();
         SeedService(db, serviceId: 1);
 
-        var svc   = new BookingService(db);
+        var svc   = new BookingService(db, NullLogger<BookingService>.Instance);
         var model = new BookingViewModel
         {
             DoctorId        = 1,
@@ -273,7 +274,7 @@ public class BookingServiceTests
         using var db = CreateDb();
         var (_, apptId) = SeedAppointmentWithCustomer(db, ownerUserId: "user-cust-1");
 
-        var svc    = new BookingService(db);
+        var svc    = new BookingService(db, NullLogger<BookingService>.Instance);
         var result = await svc.CancelAppointmentAsync(apptId, "user-cust-1", isSecretary: false);
 
         Assert.True(result);
@@ -286,7 +287,7 @@ public class BookingServiceTests
         using var db = CreateDb();
         var (_, apptId) = SeedAppointmentWithCustomer(db, ownerUserId: "user-cust-1");
 
-        var svc    = new BookingService(db);
+        var svc    = new BookingService(db, NullLogger<BookingService>.Instance);
         var result = await svc.CancelAppointmentAsync(apptId, "different-user", isSecretary: false);
 
         Assert.False(result);
@@ -299,7 +300,7 @@ public class BookingServiceTests
         using var db = CreateDb();
         var (_, apptId) = SeedAppointmentWithCustomer(db, ownerUserId: "user-cust-1");
 
-        var svc    = new BookingService(db);
+        var svc    = new BookingService(db, NullLogger<BookingService>.Instance);
         var result = await svc.CancelAppointmentAsync(apptId, "secretary-user-id", isSecretary: true);
 
         Assert.True(result);
@@ -313,7 +314,7 @@ public class BookingServiceTests
         var (_, apptId) = SeedAppointmentWithCustomer(db, ownerUserId: "user-cust-1",
             status: AppointmentStatus.Completed);
 
-        var svc    = new BookingService(db);
+        var svc    = new BookingService(db, NullLogger<BookingService>.Instance);
         var result = await svc.CancelAppointmentAsync(apptId, "user-cust-1", isSecretary: false);
 
         Assert.False(result);
@@ -340,7 +341,7 @@ public class BookingServiceTests
         });
         await db.SaveChangesAsync();
 
-        var svc    = new BookingService(db);
+        var svc    = new BookingService(db, NullLogger<BookingService>.Instance);
         var result = await svc.CompleteAppointmentAsync(99, doctorId: 10);
 
         Assert.True(result);
@@ -366,7 +367,7 @@ public class BookingServiceTests
         });
         await db.SaveChangesAsync();
 
-        var svc    = new BookingService(db);
+        var svc    = new BookingService(db, NullLogger<BookingService>.Instance);
         var result = await svc.CompleteAppointmentAsync(99, doctorId: 99);
 
         Assert.False(result);

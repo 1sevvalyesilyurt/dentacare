@@ -3,6 +3,7 @@ using DentalClinic.Web.Models;
 using DentalClinic.Web.Services;
 using DentalClinic.Web.ViewModels;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DentalClinic.Tests;
 
@@ -22,7 +23,7 @@ public class PaymentServiceTests
         using var db = CreateDb();
         SeedCompletedAppointment(db, appointmentId: 1, alreadyPaid: false);
 
-        var svc    = new PaymentService(db);
+        var svc    = new PaymentService(db, NullLogger<PaymentService>.Instance);
         var model  = new PaymentRecordViewModel { AppointmentId = 1, Amount = 500, PaymentMethod = PaymentMethod.Cash };
         var result = await svc.RecordPaymentAsync(model, "secretary-id");
 
@@ -36,7 +37,7 @@ public class PaymentServiceTests
         using var db = CreateDb();
         SeedCompletedAppointment(db, appointmentId: 2, alreadyPaid: true);
 
-        var svc    = new PaymentService(db);
+        var svc    = new PaymentService(db, NullLogger<PaymentService>.Instance);
         var model  = new PaymentRecordViewModel { AppointmentId = 2, Amount = 500, PaymentMethod = PaymentMethod.Cash };
         var result = await svc.RecordPaymentAsync(model, "secretary-id");
 
@@ -59,7 +60,7 @@ public class PaymentServiceTests
         });
         await db.SaveChangesAsync();
 
-        var svc    = new PaymentService(db);
+        var svc    = new PaymentService(db, NullLogger<PaymentService>.Instance);
         var model  = new PaymentRecordViewModel { AppointmentId = 3, Amount = 300, PaymentMethod = PaymentMethod.CreditCard };
         var result = await svc.RecordPaymentAsync(model, "secretary-id");
 
@@ -70,7 +71,7 @@ public class PaymentServiceTests
     public async Task RecordPayment_AppointmentNotFound_ReturnsNull()
     {
         using var db = CreateDb();
-        var svc    = new PaymentService(db);
+        var svc    = new PaymentService(db, NullLogger<PaymentService>.Instance);
         var model  = new PaymentRecordViewModel { AppointmentId = 999, Amount = 100, PaymentMethod = PaymentMethod.Cash };
         var result = await svc.RecordPaymentAsync(model, "secretary-id");
 
@@ -83,7 +84,7 @@ public class PaymentServiceTests
         using var db = CreateDb();
         SeedCompletedAppointment(db, appointmentId: 10, alreadyPaid: false);
 
-        var svc    = new PaymentService(db);
+        var svc    = new PaymentService(db, NullLogger<PaymentService>.Instance);
         var model  = new PaymentRecordViewModel { AppointmentId = 10, Amount = 750, PaymentMethod = PaymentMethod.BankTransfer };
         var invoice = await svc.RecordPaymentAsync(model, "secretary-id");
 

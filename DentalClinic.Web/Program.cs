@@ -4,9 +4,37 @@ using DentalClinic.Web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
+using Serilog.Events;
 using System.Threading.RateLimiting;
 
+// ─── Bootstrap logger (captures startup errors before full config loads) ──
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
 var builder = WebApplication.CreateBuilder(args);
+
+// ─── Serilog: skip in test environment to avoid bootstrap logger conflicts ─
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Host.UseSerilog((ctx, services, config) => config
+        .ReadFrom.Configuration(ctx.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithMachineName()
+        .Enrich.WithThreadId()
+        .WriteTo.Console(outputTemplate:
+            "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+        .WriteTo.File(
+            path: "logs/dentalclinic-.log",
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 30,
+            outputTemplate:
+                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"));
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. Services Registration
@@ -107,6 +135,20 @@ else
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
+}
+
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseSerilogRequestLogging(opts =>
+    {
+        opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} → {StatusCode} ({Elapsed:0.0}ms)";
+        opts.GetLevel = (ctx, elapsed, ex) =>
+            ex != null || ctx.Response.StatusCode >= 500
+                ? LogEventLevel.Error
+                : ctx.Response.StatusCode >= 400
+                    ? LogEventLevel.Warning
+                    : LogEventLevel.Information;
+    });
 }
 
 app.UseHttpsRedirection();

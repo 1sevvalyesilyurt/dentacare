@@ -2,6 +2,7 @@ using DentalClinic.Web.Data;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -24,6 +25,10 @@ public class DentalClinicFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        // Suppress Serilog in tests — avoids "logger already frozen" when
+        // multiple WebApplicationFactory instances share the bootstrap logger.
+        builder.ConfigureLogging(logging => logging.ClearProviders());
 
         builder.ConfigureServices(services =>
         {

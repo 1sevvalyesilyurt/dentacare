@@ -21,9 +21,17 @@ namespace DentalClinic.Web.ViewModels
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            if (AppointmentDate < DateTime.UtcNow)
+            var now    = DateTime.UtcNow;
+            var maxDate = now.AddMonths(6);
+
+            if (AppointmentDate <= now)
                 yield return new ValidationResult(
                     "Appointment date must be in the future.",
+                    new[] { nameof(AppointmentDate) });
+
+            else if (AppointmentDate > maxDate)
+                yield return new ValidationResult(
+                    "Appointments can only be booked up to 6 months in advance.",
                     new[] { nameof(AppointmentDate) });
         }
 

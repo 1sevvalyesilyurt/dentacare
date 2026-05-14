@@ -10,11 +10,11 @@ namespace DentalClinic.Web.Services
         /// Business Rule BR-03: Appointment must be Completed; no duplicate payments allowed.
         /// Returns the generated InvoiceNumber, or null if validation fails.
         /// </summary>
-        Task<string?> RecordPaymentAsync(PaymentRecordViewModel model, string secretaryUserId);
+        Task<string?> RecordPaymentAsync(PaymentRecordViewModel model, string secretaryUserId, CancellationToken ct = default);
 
         /// <summary>
         /// Retrieves all completed appointments that do not yet have a Payment record.
         /// </summary>
-        Task<List<Appointment>> GetUnpaidCompletedAppointmentsAsync();
+        Task<List<Appointment>> GetUnpaidCompletedAppointmentsAsync(CancellationToken ct = default);
     }
 }

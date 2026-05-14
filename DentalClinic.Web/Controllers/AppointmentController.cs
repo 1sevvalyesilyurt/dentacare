@@ -5,6 +5,7 @@ using DentalClinic.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace DentalClinic.Web.Controllers
@@ -33,9 +34,10 @@ namespace DentalClinic.Web.Controllers
         // GET /Appointment — Upcoming appointments (UC-C06)
         public async Task<IActionResult> Index()
         {
+            var ct   = HttpContext.RequestAborted;
             var user = await _userManager.GetUserAsync(User);
             var customer = await _db.Customers
-                .FirstOrDefaultAsync(c => c.UserId == user!.Id);
+                .FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
 
             if (customer == null) return RedirectToAction("Register", "Account");
 
@@ -46,14 +48,13 @@ namespace DentalClinic.Web.Controllers
                          && a.AppointmentDate >= DateTime.UtcNow
                          && a.Status != AppointmentStatus.Cancelled)
                 .OrderBy(a => a.AppointmentDate)
-                .ToListAsync();
+                .ToListAsync(ct);
 
-            // Mark unread notifications as read when user opens the page
             var unread = await _db.Notifications
                 .Where(n => n.CustomerId == customer.CustomerId && !n.IsRead)
-                .ToListAsync();
+                .ToListAsync(ct);
             unread.ForEach(n => n.IsRead = true);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
 
             return View(appointments);
         }
@@ -62,6 +63,7 @@ namespace DentalClinic.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Book()
         {
+            var ct    = HttpContext.RequestAborted;
             var model = new BookingViewModel
             {
                 AvailableDoctors = await _db.Doctors
@@ -69,17 +71,17 @@ namespace DentalClinic.Web.Controllers
                     .Where(d => d.IsActive)
                     .Select(d => new DoctorSelectItem
                     {
-                        DoctorId = d.DoctorId,
+                        DoctorId    = d.DoctorId,
                         DisplayName = $"Dr. {d.User!.FullName} — {d.Specialty}"
-                    }).ToListAsync(),
+                    }).ToListAsync(ct),
 
                 AvailableServices = await _db.Services
                     .Where(s => s.IsActive)
                     .Select(s => new ServiceSelectItem
                     {
-                        ServiceId = s.ServiceId,
+                        ServiceId   = s.ServiceId,
                         DisplayName = $"{s.Name} — ₺{s.BaseFee:N0} ({s.DurationMinutes} min)"
-                    }).ToListAsync()
+                    }).ToListAsync(ct)
             };
             return View(model);
         }
@@ -89,27 +91,28 @@ namespace DentalClinic.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Book(BookingViewModel model)
         {
+            var ct = HttpContext.RequestAborted;
+
             if (!ModelState.IsValid)
             {
-                // Repopulate dropdowns
                 model.AvailableDoctors = await _db.Doctors.Include(d => d.User)
                     .Where(d => d.IsActive)
                     .Select(d => new DoctorSelectItem
                     {
-                        DoctorId = d.DoctorId,
+                        DoctorId    = d.DoctorId,
                         DisplayName = $"Dr. {d.User!.FullName} — {d.Specialty}"
-                    }).ToListAsync();
+                    }).ToListAsync(ct);
                 model.AvailableServices = await _db.Services.Where(s => s.IsActive)
                     .Select(s => new ServiceSelectItem
                     {
-                        ServiceId = s.ServiceId,
+                        ServiceId   = s.ServiceId,
                         DisplayName = $"{s.Name} — ₺{s.BaseFee:N0} ({s.DurationMinutes} min)"
-                    }).ToListAsync();
+                    }).ToListAsync(ct);
                 return View(model);
             }
 
-            var user = await _userManager.GetUserAsync(User);
-            var appointment = await _bookingService.CreateAppointmentAsync(model, user!.Id);
+            var user        = await _userManager.GetUserAsync(User);
+            var appointment = await _bookingService.CreateAppointmentAsync(model, user!.Id, ct);
 
             if (appointment == null)
             {
@@ -126,22 +129,31 @@ namespace DentalClinic.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Slots(int doctorId, DateTime date)
         {
-            var slots = await _bookingService.GetAvailableSlotsAsync(doctorId, date);
-            return Json(slots.Select(s => s.ToString("HH:mm")));
+            try
+            {
+                var slots = await _bookingService.GetAvailableSlotsAsync(
+                    doctorId, date, HttpContext.RequestAborted);
+                return Json(slots.Select(s => s.ToString("HH:mm")));
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new { error = "Unable to load available slots. Please try again." });
+            }
         }
 
         // GET /Appointment/Confirmed/{id}
         public async Task<IActionResult> Confirmed(int id)
         {
+            var ct   = HttpContext.RequestAborted;
             var user = await _userManager.GetUserAsync(User);
-            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id);
+            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
             if (customer == null) return NotFound();
 
             var appointment = await _db.Appointments
                 .Include(a => a.Doctor!.User)
                 .Include(a => a.Service)
                 .FirstOrDefaultAsync(a => a.AppointmentId == id
-                                       && a.CustomerId == customer.CustomerId);
+                                       && a.CustomerId == customer.CustomerId, ct);
 
             if (appointment == null) return NotFound();
             return View(appointment);
@@ -150,8 +162,9 @@ namespace DentalClinic.Web.Controllers
         // GET /Appointment/History — Past appointments (UC-C07)
         public async Task<IActionResult> History()
         {
+            var ct   = HttpContext.RequestAborted;
             var user = await _userManager.GetUserAsync(User);
-            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id);
+            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
             if (customer == null) return NotFound();
 
             var appointments = await _db.Appointments
@@ -163,7 +176,7 @@ namespace DentalClinic.Web.Controllers
                           || a.Status == AppointmentStatus.Cancelled
                           || a.AppointmentDate < DateTime.UtcNow))
                 .OrderByDescending(a => a.AppointmentDate)
-                .ToListAsync();
+                .ToListAsync(ct);
 
             return View(appointments);
         }
@@ -173,8 +186,9 @@ namespace DentalClinic.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Cancel(int id)
         {
-            var user = await _userManager.GetUserAsync(User);
-            var success = await _bookingService.CancelAppointmentAsync(id, user!.Id, isSecretary: false);
+            var user    = await _userManager.GetUserAsync(User);
+            var success = await _bookingService.CancelAppointmentAsync(
+                id, user!.Id, isSecretary: false, HttpContext.RequestAborted);
 
             TempData[success ? "SuccessMessage" : "ErrorMessage"] =
                 success ? "Appointment cancelled successfully." : "This appointment cannot be cancelled.";
