@@ -27,12 +27,13 @@ namespace DentalClinic.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Unread()
         {
-            var user = await _userManager.GetUserAsync(User);
-            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id);
+            var ct       = HttpContext.RequestAborted;
+            var user     = await _userManager.GetUserAsync(User);
+            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
             if (customer == null) return Json(new { count = 0 });
 
             var count = await _db.Notifications
-                .CountAsync(n => n.CustomerId == customer.CustomerId && !n.IsRead);
+                .CountAsync(n => n.CustomerId == customer.CustomerId && !n.IsRead, ct);
 
             return Json(new { count });
         }
@@ -40,18 +41,18 @@ namespace DentalClinic.Web.Controllers
         // GET /Notification/All — Full notification list page
         public async Task<IActionResult> All()
         {
-            var user = await _userManager.GetUserAsync(User);
-            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id);
+            var ct       = HttpContext.RequestAborted;
+            var user     = await _userManager.GetUserAsync(User);
+            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
             if (customer == null) return RedirectToAction("Index", "Appointment");
 
             var notifications = await _db.Notifications
                 .Where(n => n.CustomerId == customer.CustomerId)
                 .OrderByDescending(n => n.CreatedAt)
-                .ToListAsync();
+                .ToListAsync(ct);
 
-            // Mark all as read on view
             notifications.Where(n => !n.IsRead).ToList().ForEach(n => n.IsRead = true);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
 
             return View(notifications);
         }

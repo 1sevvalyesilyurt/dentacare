@@ -227,8 +227,11 @@ static async Task SeedDataAsync(IServiceProvider services, IConfiguration config
     const string secretaryEmail = "secretary@dentacare.com";
     if (await userManager.FindByEmailAsync(secretaryEmail) == null)
     {
-        var secretaryPassword = configuration["SeedSettings:DefaultSecretaryPassword"]
-            ?? throw new InvalidOperationException("SeedSettings:DefaultSecretaryPassword is not configured.");
+        var secretaryPassword = configuration["SeedSettings:DefaultSecretaryPassword"];
+        if (string.IsNullOrWhiteSpace(secretaryPassword))
+            throw new InvalidOperationException(
+                "SeedSettings:DefaultSecretaryPassword is not configured. " +
+                "Set it via environment variable: SeedSettings__DefaultSecretaryPassword");
 
         var secretary = new ApplicationUser
         {
