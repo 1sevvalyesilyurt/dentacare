@@ -53,26 +53,35 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 // ─── Background Service (Reminder Notifications - UC-SYS01) ───────────────
 builder.Services.AddHostedService<ReminderBackgroundService>();
 
-// ─── Rate Limiting ────────────────────────────────────────────────────────
+// ─── Rate Limiting (per client IP) ───────────────────────────────────────
 builder.Services.AddRateLimiter(options =>
 {
+    static string GetClientIp(HttpContext ctx) =>
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
     // Login endpoint: max 10 attempts per minute per IP
-    options.AddFixedWindowLimiter("login", o =>
-    {
-        o.Window            = TimeSpan.FromMinutes(1);
-        o.PermitLimit       = 10;
-        o.QueueLimit        = 0;
-        o.AutoReplenishment = true;
-    });
+    options.AddPolicy("login", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetClientIp(ctx),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window            = TimeSpan.FromMinutes(1),
+                PermitLimit       = 10,
+                QueueLimit        = 0,
+                AutoReplenishment = true
+            }));
 
     // Register endpoint: max 5 per minute per IP
-    options.AddFixedWindowLimiter("register", o =>
-    {
-        o.Window            = TimeSpan.FromMinutes(1);
-        o.PermitLimit       = 5;
-        o.QueueLimit        = 0;
-        o.AutoReplenishment = true;
-    });
+    options.AddPolicy("register", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetClientIp(ctx),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window            = TimeSpan.FromMinutes(1),
+                PermitLimit       = 5,
+                QueueLimit        = 0,
+                AutoReplenishment = true
+            }));
 
     options.RejectionStatusCode = 429;
 });

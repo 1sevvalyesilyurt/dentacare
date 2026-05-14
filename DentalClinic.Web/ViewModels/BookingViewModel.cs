@@ -5,7 +5,7 @@ namespace DentalClinic.Web.ViewModels
     /// <summary>
     /// ViewModel for the customer's appointment booking form.
     /// </summary>
-    public class BookingViewModel
+    public class BookingViewModel : IValidatableObject
     {
         [Required]
         [Display(Name = "Doctor")]
@@ -18,6 +18,14 @@ namespace DentalClinic.Web.ViewModels
         [Required]
         [Display(Name = "Appointment Date & Time")]
         public DateTime AppointmentDate { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (AppointmentDate < DateTime.UtcNow)
+                yield return new ValidationResult(
+                    "Appointment date must be in the future.",
+                    new[] { nameof(AppointmentDate) });
+        }
 
         [StringLength(500)]
         [Display(Name = "Your Complaint / Note")]
