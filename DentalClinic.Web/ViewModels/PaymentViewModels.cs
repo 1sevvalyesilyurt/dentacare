@@ -37,8 +37,19 @@ namespace DentalClinic.Web.ViewModels
         public decimal TotalRevenueThisMonth { get; set; }
         public int PendingPaymentsCount { get; set; } // Completed appointments without a Payment record
 
+        public List<PendingPaymentRow> PendingPayments { get; set; } = new();
         public List<RecentPaymentRow> RecentPayments { get; set; } = new();
         public List<DoctorEarningsRow> DoctorEarnings { get; set; } = new();
+    }
+
+    public class PendingPaymentRow
+    {
+        public int AppointmentId { get; set; }
+        public string PatientName { get; set; } = string.Empty;
+        public string DoctorName { get; set; } = string.Empty;
+        public string ServiceName { get; set; } = string.Empty;
+        public DateTime AppointmentDate { get; set; }
+        public decimal Fee { get; set; }
     }
 
     public class RecentPaymentRow
