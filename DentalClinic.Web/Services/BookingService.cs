@@ -8,20 +8,25 @@ namespace DentalClinic.Web.Services
     public class BookingService : IBookingService
     {
         private readonly AppDbContext _db;
+        private readonly ILogger<BookingService> _logger;
 
-        public BookingService(AppDbContext db)
+        public BookingService(AppDbContext db, ILogger<BookingService> logger)
         {
-            _db = db;
+            _db     = db;
+            _logger = logger;
         }
 
         /// <inheritdoc/>
-        public async Task<List<DateTime>> GetAvailableSlotsAsync(int doctorId, DateTime date)
+        public async Task<List<DateTime>> GetAvailableSlotsAsync(int doctorId, DateTime date, CancellationToken ct = default)
         {
-            var doctor = await _db.Doctors.FindAsync(doctorId);
+            var doctor = await _db.Doctors.FindAsync(new object[] { doctorId }, ct);
             if (doctor == null) return new List<DateTime>();
 
+            // Guard: misconfigured doctor record would cause infinite loop
+            if (doctor.SlotDurationMinutes <= 0) return new List<DateTime>();
+
             // Generate all possible slots for the given day
-            var slots = new List<DateTime>();
+            var slots   = new List<DateTime>();
             var current = date.Date + doctor.WorkingHoursStart;
             var endTime = date.Date + doctor.WorkingHoursEnd;
 
@@ -37,80 +42,91 @@ namespace DentalClinic.Web.Services
                          && a.AppointmentDate.Date == date.Date
                          && a.Status != AppointmentStatus.Cancelled)
                 .Select(a => a.AppointmentDate)
-                .ToListAsync();
+                .ToListAsync(ct);
 
-            // Remove slots during doctor leave (BR-05 prerequisite)
+            // Remove slots during doctor leave (BR-05)
             var isOnLeave = await _db.DoctorLeaves
                 .AnyAsync(l => l.DoctorId == doctorId
                             && l.StartDate.Date <= date.Date
-                            && l.EndDate.Date >= date.Date);
+                            && l.EndDate.Date >= date.Date, ct);
 
             if (isOnLeave) return new List<DateTime>();
 
-            return slots.Where(s => !bookedTimes.Contains(s)).ToList();
+            // For today, exclude slots that have already passed
+            var now = DateTime.UtcNow;
+            return slots
+                .Where(s => !bookedTimes.Contains(s))
+                .Where(s => s > now)
+                .ToList();
         }
 
         /// <inheritdoc/>
-        public async Task<Appointment?> CreateAppointmentAsync(BookingViewModel model, string userId)
+        public async Task<Appointment?> CreateAppointmentAsync(BookingViewModel model, string userId, CancellationToken ct = default)
         {
-            // Resolve customer profile from ApplicationUser.Id
-            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == userId);
+            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == userId, ct);
             if (customer == null) return null;
 
-            var service = await _db.Services.FindAsync(model.ServiceId);
+            var service = await _db.Services.FindAsync(new object[] { model.ServiceId }, ct);
             if (service == null) return null;
 
-            // BR-01: Check for slot conflict at DB level before insert
+            // Server-side slot validation: the requested time must be a real slot
+            var validSlots = await GetAvailableSlotsAsync(model.DoctorId, model.AppointmentDate.Date, ct);
+            if (!validSlots.Contains(model.AppointmentDate)) return null;
+
+            // BR-01 pre-check (optimistic; the unique index is the final guard)
             bool slotTaken = await _db.Appointments.AnyAsync(a =>
                 a.DoctorId == model.DoctorId
                 && a.AppointmentDate == model.AppointmentDate
-                && a.Status != AppointmentStatus.Cancelled);
+                && a.Status != AppointmentStatus.Cancelled, ct);
 
             if (slotTaken) return null;
 
-            // Check doctor leave
-            bool onLeave = await _db.DoctorLeaves.AnyAsync(l =>
-                l.DoctorId == model.DoctorId
-                && l.StartDate.Date <= model.AppointmentDate.Date
-                && l.EndDate.Date >= model.AppointmentDate.Date);
-
-            if (onLeave) return null;
-
             var appointment = new Appointment
             {
-                CustomerId = customer.CustomerId,
-                DoctorId = model.DoctorId,
-                ServiceId = model.ServiceId,
+                CustomerId      = customer.CustomerId,
+                DoctorId        = model.DoctorId,
+                ServiceId       = model.ServiceId,
                 AppointmentDate = model.AppointmentDate,
-                Status = AppointmentStatus.Confirmed,
-                PatientNote = model.PatientNote,
-                Fee = service.BaseFee,
-                CreatedAt = DateTime.UtcNow
+                Status          = AppointmentStatus.Confirmed,
+                PatientNote     = model.PatientNote,
+                Fee             = service.BaseFee,
+                CreatedAt       = DateTime.UtcNow
             };
 
             _db.Appointments.Add(appointment);
-            await _db.SaveChangesAsync();
 
-            // Create in-app booking confirmation notification
-            var notification = new Notification
+            try
             {
-                CustomerId = customer.CustomerId,
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Unique constraint violation: another request won the race for this slot
+                return null;
+            }
+
+            _db.Notifications.Add(new Notification
+            {
+                CustomerId    = customer.CustomerId,
                 AppointmentId = appointment.AppointmentId,
-                Message = $"Your appointment is confirmed for {appointment.AppointmentDate:dddd, dd MMM yyyy} at {appointment.AppointmentDate:HH:mm}.",
-                CreatedAt = DateTime.UtcNow
-            };
-            _db.Notifications.Add(notification);
-            await _db.SaveChangesAsync();
+                Message       = $"Your appointment is confirmed for {appointment.AppointmentDate:dddd, dd MMM yyyy} at {appointment.AppointmentDate:HH:mm}.",
+                CreatedAt     = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "AUDIT Appointment created. AppointmentId={AppointmentId} CustomerId={CustomerId} DoctorId={DoctorId} Date={Date}",
+                appointment.AppointmentId, customer.CustomerId, model.DoctorId, appointment.AppointmentDate);
 
             return appointment;
         }
 
         /// <inheritdoc/>
-        public async Task<bool> CancelAppointmentAsync(int appointmentId, string userId, bool isSecretary = false)
+        public async Task<bool> CancelAppointmentAsync(int appointmentId, string userId, bool isSecretary = false, CancellationToken ct = default)
         {
             var appointment = await _db.Appointments
                 .Include(a => a.Customer)
-                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId);
+                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId, ct);
 
             if (appointment == null) return false;
 
@@ -124,21 +140,25 @@ namespace DentalClinic.Web.Services
             if (!isOwner && !isSecretary) return false;
 
             appointment.Status = AppointmentStatus.Cancelled;
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "AUDIT Appointment cancelled. AppointmentId={AppointmentId} CancelledBy={UserId} IsSecretary={IsSecretary}",
+                appointmentId, userId, isSecretary);
+
             return true;
         }
 
         /// <inheritdoc/>
-        public async Task<bool> RescheduleAppointmentAsync(int appointmentId, DateTime newAppointmentDate)
+        public async Task<bool> RescheduleAppointmentAsync(int appointmentId, DateTime newAppointmentDate, CancellationToken ct = default)
         {
             var appointment = await _db.Appointments
                 .Include(a => a.Doctor)
-                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId);
+                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId, ct);
 
             if (appointment == null || appointment.Doctor == null)
                 return false;
 
-            // Only active appointments can be rescheduled
             if (appointment.Status == AppointmentStatus.Cancelled ||
                 appointment.Status == AppointmentStatus.Completed)
                 return false;
@@ -146,58 +166,63 @@ namespace DentalClinic.Web.Services
             var doctor = appointment.Doctor;
             var newTime = newAppointmentDate.TimeOfDay;
 
-            // Must be inside working hours
             if (newTime < doctor.WorkingHoursStart || newTime >= doctor.WorkingHoursEnd)
                 return false;
 
-            // Must align with doctor's slot interval
             var minutesFromStart = (newTime - doctor.WorkingHoursStart).TotalMinutes;
             if (minutesFromStart < 0 || minutesFromStart % doctor.SlotDurationMinutes != 0)
                 return false;
 
-            // Doctor cannot be on leave for target date
             var onLeave = await _db.DoctorLeaves.AnyAsync(l =>
                 l.DoctorId == appointment.DoctorId &&
                 l.StartDate.Date <= newAppointmentDate.Date &&
-                l.EndDate.Date >= newAppointmentDate.Date);
+                l.EndDate.Date >= newAppointmentDate.Date, ct);
             if (onLeave) return false;
 
-            // Slot must be free (excluding this appointment)
             var slotTaken = await _db.Appointments.AnyAsync(a =>
                 a.AppointmentId != appointment.AppointmentId &&
                 a.DoctorId == appointment.DoctorId &&
                 a.AppointmentDate == newAppointmentDate &&
-                a.Status != AppointmentStatus.Cancelled);
+                a.Status != AppointmentStatus.Cancelled, ct);
             if (slotTaken) return false;
 
             appointment.AppointmentDate = newAppointmentDate;
-            appointment.ReminderSent = false; // Allow reminder service to send for the new time.
+            appointment.ReminderSent = false;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
 
             _db.Notifications.Add(new Notification
             {
-                CustomerId = appointment.CustomerId,
+                CustomerId    = appointment.CustomerId,
                 AppointmentId = appointment.AppointmentId,
-                Message = $"Your appointment has been rescheduled to {newAppointmentDate:dddd, dd MMM yyyy} at {newAppointmentDate:HH:mm}.",
-                CreatedAt = DateTime.UtcNow
+                Message       = $"Your appointment has been rescheduled to {newAppointmentDate:dddd, dd MMM yyyy} at {newAppointmentDate:HH:mm}.",
+                CreatedAt     = DateTime.UtcNow
             });
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "AUDIT Appointment rescheduled. AppointmentId={AppointmentId} NewDate={NewDate}",
+                appointmentId, newAppointmentDate);
 
             return true;
         }
 
         /// <inheritdoc/>
-        public async Task<bool> CompleteAppointmentAsync(int appointmentId, int doctorId)
+        public async Task<bool> CompleteAppointmentAsync(int appointmentId, int doctorId, CancellationToken ct = default)
         {
             var appointment = await _db.Appointments
-                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId && a.DoctorId == doctorId);
+                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId && a.DoctorId == doctorId, ct);
 
             if (appointment == null || appointment.Status != AppointmentStatus.Confirmed)
                 return false;
 
             appointment.Status = AppointmentStatus.Completed;
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "AUDIT Appointment completed. AppointmentId={AppointmentId} DoctorId={DoctorId}",
+                appointmentId, doctorId);
+
             return true;
         }
     }

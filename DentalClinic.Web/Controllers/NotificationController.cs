@@ -27,12 +27,13 @@ namespace DentalClinic.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Unread()
         {
-            var user = await _userManager.GetUserAsync(User);
-            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id);
+            var ct       = HttpContext.RequestAborted;
+            var user     = await _userManager.GetUserAsync(User);
+            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
             if (customer == null) return Json(new { count = 0 });
 
             var count = await _db.Notifications
-                .CountAsync(n => n.CustomerId == customer.CustomerId && !n.IsRead);
+                .CountAsync(n => n.CustomerId == customer.CustomerId && !n.IsRead, ct);
 
             return Json(new { count });
         }
@@ -40,18 +41,17 @@ namespace DentalClinic.Web.Controllers
         // GET /Notification/All — Full notification list page
         public async Task<IActionResult> All()
         {
-            var user = await _userManager.GetUserAsync(User);
-            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id);
+            var ct       = HttpContext.RequestAborted;
+            var user     = await _userManager.GetUserAsync(User);
+            var customer = await _db.Customers.FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
             if (customer == null) return RedirectToAction("Index", "Appointment");
 
             var notifications = await _db.Notifications
                 .Where(n => n.CustomerId == customer.CustomerId)
                 .OrderByDescending(n => n.CreatedAt)
-                .ToListAsync();
+                .ToListAsync(ct);
 
-            // Capture which notifications were unread BEFORE marking them as read,
-            // so the view can render "New" badges on first render while the navbar
-            // badge is already cleared for subsequent polls.
+            // Capture unread IDs before marking so the view can render "New" badges.
             var unreadIds = notifications
                 .Where(n => !n.IsRead)
                 .Select(n => n.NotificationId)
@@ -60,7 +60,7 @@ namespace DentalClinic.Web.Controllers
             ViewBag.UnreadNotificationIds = unreadIds;
 
             notifications.ForEach(n => n.IsRead = true);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
 
             return View(notifications);
         }

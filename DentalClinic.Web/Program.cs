@@ -2,9 +2,39 @@ using DentalClinic.Web.Data;
 using DentalClinic.Web.Models;
 using DentalClinic.Web.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
+using Serilog.Events;
+using System.Threading.RateLimiting;
+
+// ─── Bootstrap logger (captures startup errors before full config loads) ──
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ─── Serilog: skip in test environment to avoid bootstrap logger conflicts ─
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Host.UseSerilog((ctx, services, config) => config
+        .ReadFrom.Configuration(ctx.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithMachineName()
+        .Enrich.WithThreadId()
+        .WriteTo.Console(outputTemplate:
+            "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+        .WriteTo.File(
+            path: "logs/dentalclinic-.log",
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 30,
+            outputTemplate:
+                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"));
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. Services Registration
@@ -19,12 +49,12 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     // Password settings
     options.Password.RequireDigit           = true;
-    options.Password.RequiredLength         = 6;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase       = false;
+    options.Password.RequiredLength         = 8;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequireUppercase       = true;
 
     // Lockout settings
-    options.Lockout.DefaultLockoutTimeSpan  = TimeSpan.FromMinutes(5);
+    options.Lockout.DefaultLockoutTimeSpan  = TimeSpan.FromMinutes(15);
     options.Lockout.MaxFailedAccessAttempts = 5;
 
     // User settings
@@ -39,16 +69,55 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath         = "/Account/Login";
     options.LogoutPath        = "/Account/Logout";
     options.AccessDeniedPath  = "/Account/AccessDenied";
-    options.ExpireTimeSpan    = TimeSpan.FromDays(7);
+    options.ExpireTimeSpan    = TimeSpan.FromHours(8);
     options.SlidingExpiration = true;
 });
 
 // ─── Application Services ─────────────────────────────────────────────────
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
-// ─── Background Service (Reminder Notifications - UC-SYS01) ───────────────
+// ─── Background Services ──────────────────────────────────────────────────
 builder.Services.AddHostedService<ReminderBackgroundService>();
+builder.Services.AddHostedService<NotificationCleanupService>();
+
+// ─── Rate Limiting (per client IP) ───────────────────────────────────────
+builder.Services.AddRateLimiter(options =>
+{
+    static string GetClientIp(HttpContext ctx) =>
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    // Login endpoint: max 10 attempts per minute per IP
+    options.AddPolicy("login", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetClientIp(ctx),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window            = TimeSpan.FromMinutes(1),
+                PermitLimit       = 10,
+                QueueLimit        = 0,
+                AutoReplenishment = true
+            }));
+
+    // Register endpoint: max 5 per minute per IP
+    options.AddPolicy("register", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetClientIp(ctx),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window            = TimeSpan.FromMinutes(1),
+                PermitLimit       = 5,
+                QueueLimit        = 0,
+                AutoReplenishment = true
+            }));
+
+    options.RejectionStatusCode = 429;
+});
+
+// ─── Health Checks ────────────────────────────────────────────────────────
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database");
 
 // ─── MVC ──────────────────────────────────────────────────────────────────
 builder.Services.AddControllersWithViews();
@@ -68,12 +137,48 @@ else
     app.UseHsts();
 }
 
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseSerilogRequestLogging(opts =>
+    {
+        opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} → {StatusCode} ({Elapsed:0.0}ms)";
+        opts.GetLevel = (ctx, elapsed, ex) =>
+            ex != null || ctx.Response.StatusCode >= 500
+                ? LogEventLevel.Error
+                : ctx.Response.StatusCode >= 400
+                    ? LogEventLevel.Warning
+                    : LogEventLevel.Information;
+    });
+}
+
 app.UseHttpsRedirection();
+
+// ─── Security Headers ─────────────────────────────────────────────────────
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    context.Response.Headers.Append(
+        "Content-Security-Policy",
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; " +
+        "font-src 'self';");
+    await next();
+});
+
 app.UseStaticFiles();
 app.UseRouting();
+app.UseRateLimiter();
 
 app.UseAuthentication(); // Must come before UseAuthorization
 app.UseAuthorization();
+
+app.MapHealthChecks("/health");
 
 app.MapControllerRoute(
     name: "default",
@@ -122,8 +227,11 @@ static async Task SeedDataAsync(IServiceProvider services, IConfiguration config
     const string secretaryEmail = "secretary@dentacare.com";
     if (await userManager.FindByEmailAsync(secretaryEmail) == null)
     {
-        var secretaryPassword = configuration["SeedSettings:DefaultSecretaryPassword"]
-            ?? throw new InvalidOperationException("SeedSettings:DefaultSecretaryPassword is not configured.");
+        var secretaryPassword = configuration["SeedSettings:DefaultSecretaryPassword"];
+        if (string.IsNullOrWhiteSpace(secretaryPassword))
+            throw new InvalidOperationException(
+                "SeedSettings:DefaultSecretaryPassword is not configured. " +
+                "Set it via environment variable: SeedSettings__DefaultSecretaryPassword");
 
         var secretary = new ApplicationUser
         {
@@ -154,3 +262,5 @@ static async Task SeedDataAsync(IServiceProvider services, IConfiguration config
         await db.SaveChangesAsync();
     }
 }
+
+public partial class Program { }

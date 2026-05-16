@@ -3,6 +3,7 @@ using DentalClinic.Web.Models;
 using DentalClinic.Web.ViewModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace DentalClinic.Web.Controllers
@@ -43,6 +44,7 @@ namespace DentalClinic.Web.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> SecretaryLogin(LoginViewModel model)
         {
             if (!ModelState.IsValid) return View(model);
@@ -61,6 +63,7 @@ namespace DentalClinic.Web.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> DoctorLogin(LoginViewModel model)
         {
             if (!ModelState.IsValid) return View(model);
@@ -80,6 +83,7 @@ namespace DentalClinic.Web.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
             if (!ModelState.IsValid) return View(model);
@@ -98,6 +102,7 @@ namespace DentalClinic.Web.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
+        [EnableRateLimiting("register")]
         public async Task<IActionResult> Register(RegisterViewModel model)
         {
             if (!ModelState.IsValid) return View(model);
@@ -177,7 +182,11 @@ namespace DentalClinic.Web.Controllers
 
             if (result.Succeeded)
             {
-                _logger.LogInformation("{Role} {Email} logged in.", expectedRole, model.Email);
+                _logger.LogInformation(
+                    "AUDIT Login succeeded. Role={Role} Email={Email} IP={IP}",
+                    expectedRole, model.Email,
+                    HttpContext.Connection.RemoteIpAddress);
+
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                     return Redirect(returnUrl);
                 return RedirectToRoleHome();
@@ -185,9 +194,19 @@ namespace DentalClinic.Web.Controllers
 
             if (result.IsLockedOut)
             {
+                _logger.LogWarning(
+                    "AUDIT Account locked. Role={Role} Email={Email} IP={IP}",
+                    expectedRole, model.Email,
+                    HttpContext.Connection.RemoteIpAddress);
+
                 ModelState.AddModelError(string.Empty, "Account locked. Try again in 5 minutes.");
                 return View(viewName, model);
             }
+
+            _logger.LogWarning(
+                "AUDIT Login failed. Role={Role} Email={Email} IP={IP}",
+                expectedRole, model.Email,
+                HttpContext.Connection.RemoteIpAddress);
 
             ModelState.AddModelError(string.Empty, "Invalid email or password.");
             return View(viewName, model);

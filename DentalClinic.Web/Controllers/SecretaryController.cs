@@ -98,6 +98,15 @@ namespace DentalClinic.Web.Controllers
                 return View(model);
             }
 
+            // Verify the submitted userId belongs to a real Customer record
+            var customerExists = await _db.Customers.AnyAsync(c => c.UserId == customerUserId);
+            if (!customerExists)
+            {
+                ModelState.AddModelError(string.Empty, "Please select a valid customer.");
+                await PopulateBookingDropdowns();
+                return View(model);
+            }
+
             var appointment = await _bookingService.CreateAppointmentAsync(model, customerUserId);
             if (appointment == null)
             {
