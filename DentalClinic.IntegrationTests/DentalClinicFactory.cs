@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
@@ -31,8 +32,26 @@ public class DentalClinicFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // Replace SQLite with InMemory
+            // Short shutdown timeout so factory.DisposeAsync() doesn't wait 30s
+            // for background services (ReminderBackgroundService, NotificationCleanupService).
+            services.Configure<HostOptions>(opts =>
+                opts.ShutdownTimeout = TimeSpan.FromMilliseconds(500));
+
+            // Replace SQLite with InMemory.
+            // EF Core 9 registers both DbContextOptions<T> AND
+            // IDbContextOptionsConfiguration<T> (carries the provider registration).
+            // Both must be removed to avoid "multiple providers registered" error.
             services.RemoveAll<DbContextOptions<AppDbContext>>();
+
+            var optCfgTypes = services
+                .Select(d => d.ServiceType)
+                .Where(t => t.IsGenericType &&
+                            t.Name.Contains("IDbContextOptionsConfiguration") &&
+                            t.GetGenericArguments().Contains(typeof(AppDbContext)))
+                .Distinct()
+                .ToList();
+            foreach (var t in optCfgTypes) services.RemoveAll(t);
+
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase("IntegrationTestDb_" + Guid.NewGuid()));
 

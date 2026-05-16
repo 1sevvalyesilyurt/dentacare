@@ -127,11 +127,11 @@
                 <div class="p-4">
                     <div class="d-flex align-items-center gap-3 mb-4">
                         <div style="width:64px;height:64px;border-radius:50%;background:var(--dc-teal);display:flex;align-items:center;justify-content:center;font-size:1.75rem;font-weight:700;color:#fff;flex-shrink:0;">
-                            @User.Identity!.Name?.Substring(0, 1).ToUpper()
+                            @(User.Identity?.Name?.FirstOrDefault().ToString().ToUpper() ?? "?")
                         </div>
                         <div>
                             <div class="fw-700 fs-5">@Model.FullName</div>
-                            <div class="text-muted small">@User.Identity.Name</div>
+                            <div class="text-muted small">@User.Identity?.Name</div>
                             <span class="badge mt-1" style="background:rgba(0,188,168,0.15);color:var(--dc-teal);border:1px solid rgba(0,188,168,0.3);font-size:.7rem;">
                                 Patient
                             </span>

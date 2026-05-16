@@ -26,7 +26,7 @@
             <div class="dc-stat-card">
                 <div class="dc-stat-icon amber"><i class="bi bi-wallet2"></i></div>
                 <div>
-                    <div class="dc-stat-value">₺@((decimal)ViewBag.TotalSpent).ToString("N0")</div>
+                    <div class="dc-stat-value">₺@(((decimal)(ViewBag.TotalSpent ?? 0m)).ToString("N0"))</div>
                     <div class="dc-stat-label">Total Paid</div>
                 </div>
             </div>

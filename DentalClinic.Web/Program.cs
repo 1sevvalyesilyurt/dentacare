@@ -112,7 +112,22 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             }));
 
-    options.RejectionStatusCode = 429;
+    // Return an HTML page for 429 so the browser doesn't trigger a file download.
+    // Without Content-Type + nosniff, browsers default to application/octet-stream.
+    options.OnRejected = async (ctx, token) =>
+    {
+        ctx.HttpContext.Response.StatusCode  = 429;
+        ctx.HttpContext.Response.ContentType = "text/html; charset=utf-8";
+        await ctx.HttpContext.Response.WriteAsync("""
+            <!doctype html><html><head><meta charset="utf-8">
+            <title>Too Many Requests</title></head>
+            <body style="font-family:sans-serif;text-align:center;padding:4rem">
+              <h2>Too many attempts</h2>
+              <p>Please wait a moment and try again.</p>
+              <a href="javascript:history.back()">← Go back</a>
+            </body></html>
+            """, token);
+    };
 });
 
 // ─── Health Checks ────────────────────────────────────────────────────────

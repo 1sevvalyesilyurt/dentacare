@@ -73,8 +73,9 @@
                                         @{
                                             var badgeClass = appt.Status switch
                                             {
-                                                AppointmentStatus.Completed => "badge-confirmed",
+                                                AppointmentStatus.Completed => "badge-completed",
                                                 AppointmentStatus.Cancelled => "badge-cancelled",
+                                                AppointmentStatus.Confirmed => "badge-confirmed",
                                                 _                           => "badge-pending"
                                             };
                                         }

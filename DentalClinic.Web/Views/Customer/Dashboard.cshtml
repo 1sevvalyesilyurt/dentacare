@@ -13,7 +13,7 @@
                 <i class="bi bi-person-heart text-teal me-2"></i>
                 Welcome, @ViewBag.PatientName
             </h1>
-            <p class="text-muted small mb-0">@DateTime.Today.ToString("dddd, dd MMMM yyyy")</p>
+            <p class="text-muted small mb-0">@DateTime.UtcNow.Date.ToString("dddd, dd MMMM yyyy")</p>
         </div>
         <a asp-controller="Appointment" asp-action="Book" class="btn btn-dc-primary">
             <i class="bi bi-plus-circle me-1"></i>Book New Appointment
@@ -54,7 +54,7 @@
                onmouseout="this.style.transform='';this.style.boxShadow='';">
                 <div class="dc-stat-icon amber"><i class="bi bi-wallet2"></i></div>
                 <div>
-                    <div class="dc-stat-value">₺@((decimal)ViewBag.TotalSpent).ToString("N0")</div>
+                    <div class="dc-stat-value">₺@(((decimal)(ViewBag.TotalSpent ?? 0m)).ToString("N0"))</div>
                     <div class="dc-stat-label">Total Payments
                         <i class="bi bi-arrow-right ms-1" style="font-size:.75rem;opacity:.6;"></i>
                     </div>
@@ -94,7 +94,11 @@
                         <div class="col-md-6">
                             <div class="dc-card p-3" style="background:var(--dc-navy);">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <span class="badge-confirmed">@appt.Status</span>
+                                    @{
+                                        var upcomingBadge = appt.Status == AppointmentStatus.Confirmed
+                                            ? "badge-confirmed" : "badge-pending";
+                                    }
+                                    <span class="@upcomingBadge">@appt.Status</span>
                                     <span class="text-muted small fw-600">
                                         @appt.AppointmentDate.ToString("dd MMM")
                                         · @appt.AppointmentDate.ToString("HH:mm")

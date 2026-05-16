@@ -44,8 +44,8 @@
                     <i class="bi bi-calendar3 me-1"></i>Select Date
                 </label>
                 <input type="date" id="select-date" class="form-control"
-                       min="@DateTime.Today.ToString("yyyy-MM-dd")"
-                       max="@DateTime.Today.AddMonths(2).ToString("yyyy-MM-dd")" />
+                       min="@DateTime.UtcNow.Date.ToString("yyyy-MM-dd")"
+                       max="@DateTime.UtcNow.Date.AddMonths(2).ToString("yyyy-MM-dd")" />
             </div>
 
             <!-- Step 4: Time Slot (populated via AJAX) -->

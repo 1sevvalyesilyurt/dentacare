@@ -16,9 +16,10 @@
     --dc-border:     #243448;
     --dc-success:    #22c55e;
     --dc-danger:     #ef4444;
+    --dc-amber:      #f0c040;
     --dc-radius:     12px;
     --dc-shadow:     0 4px 24px rgba(0,0,0,0.35);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* ─── Global Reset ───────────────────────────────────────────────────────── */
@@ -201,6 +202,9 @@ html, body {
 }
 
 .form-label { font-size: 0.85rem; font-weight: 500; color: var(--dc-muted); margin-bottom: 4px; }
+
+/* Input group buttons inside dark forms */
+.dc-input { background: var(--dc-navy-mid) !important; border-color: var(--dc-border) !important; color: var(--dc-text) !important; }
 
 /* ─── Slot picker ────────────────────────────────────────────────────────── */
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.5rem; }

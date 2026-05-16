@@ -6,19 +6,30 @@ namespace DentalClinic.IntegrationTests;
 /// Integration tests for features added by Dev1 and Dev2:
 /// UC-C08 Payment History, UC-C09 Edit Profile, UC-S04 Create Appointment,
 /// UC-S05 Reschedule Appointment.
+///
+/// All tests reuse the shared factory — no per-test factories needed here
+/// (rate limiting is not involved in these flows).
 /// </summary>
 public class NewFeaturesTests : IClassFixture<DentalClinicFactory>
 {
     private readonly HttpClient _customer;
     private readonly HttpClient _secretary;
+    private readonly HttpClient _doctor;
+    private readonly HttpClient _anon;
 
     public NewFeaturesTests(DentalClinicFactory factory)
     {
-        _customer  = factory.CreateClient(new() { AllowAutoRedirect = false });
+        _customer = factory.CreateClient(new() { AllowAutoRedirect = false });
         _customer.DefaultRequestHeaders.Add("X-Test-Role", "Customer");
 
         _secretary = factory.CreateClient(new() { AllowAutoRedirect = false });
         _secretary.DefaultRequestHeaders.Add("X-Test-Role", "Secretary");
+
+        _doctor = factory.CreateClient(new() { AllowAutoRedirect = false });
+        _doctor.DefaultRequestHeaders.Add("X-Test-Role", "Doctor");
+
+        _anon = factory.CreateClient(new() { AllowAutoRedirect = false });
+        // No role header → unauthenticated
     }
 
     // ─── UC-C08: Payment History ─────────────────────────────────────────────
@@ -26,7 +37,6 @@ public class NewFeaturesTests : IClassFixture<DentalClinicFactory>
     [Fact]
     public async Task PaymentHistory_AsCustomer_NotForbidden()
     {
-        // Auth passes (not 401/403); 500 is acceptable without real DB user in test env
         var response = await _customer.GetAsync("/Customer/PaymentHistory");
 
         Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -36,10 +46,7 @@ public class NewFeaturesTests : IClassFixture<DentalClinicFactory>
     [Fact]
     public async Task PaymentHistory_Unauthenticated_Returns401()
     {
-        await using var factory = new DentalClinicFactory();
-        var anon = factory.CreateClient(new() { AllowAutoRedirect = false });
-
-        var response = await anon.GetAsync("/Customer/PaymentHistory");
+        var response = await _anon.GetAsync("/Customer/PaymentHistory");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -47,11 +54,7 @@ public class NewFeaturesTests : IClassFixture<DentalClinicFactory>
     [Fact]
     public async Task PaymentHistory_AsDoctor_Returns403()
     {
-        await using var factory = new DentalClinicFactory();
-        var doctorClient = factory.CreateClient(new() { AllowAutoRedirect = false });
-        doctorClient.DefaultRequestHeaders.Add("X-Test-Role", "Doctor");
-
-        var response = await doctorClient.GetAsync("/Customer/PaymentHistory");
+        var response = await _doctor.GetAsync("/Customer/PaymentHistory");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -70,16 +73,20 @@ public class NewFeaturesTests : IClassFixture<DentalClinicFactory>
     [Fact]
     public async Task EditProfile_AsDoctor_Returns403()
     {
-        await using var factory = new DentalClinicFactory();
-        var doctorClient = factory.CreateClient(new() { AllowAutoRedirect = false });
-        doctorClient.DefaultRequestHeaders.Add("X-Test-Role", "Doctor");
-
-        var response = await doctorClient.GetAsync("/Customer/EditProfile");
+        var response = await _doctor.GetAsync("/Customer/EditProfile");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─── UC-S04: Create Appointment (view) ───────────────────────────────────
+    [Fact]
+    public async Task EditProfile_AsSecretary_Returns403()
+    {
+        var response = await _secretary.GetAsync("/Customer/EditProfile");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    // ─── UC-S04: Create Appointment ─────────────────────────────────────────
 
     [Fact]
     public async Task CreateAppointment_GET_AsSecretary_NotForbidden()
@@ -98,12 +105,11 @@ public class NewFeaturesTests : IClassFixture<DentalClinicFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─── UC-S05: Reschedule Appointment (view) ───────────────────────────────
+    // ─── UC-S05: Reschedule Appointment ─────────────────────────────────────
 
     [Fact]
     public async Task RescheduleAppointment_GET_AsSecretary_NotForbidden()
     {
-        // Auth passes — 404 or 500 (no real DB user) both acceptable, but never 401/403
         var response = await _secretary.GetAsync("/Secretary/RescheduleAppointment/99999");
 
         Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -118,7 +124,7 @@ public class NewFeaturesTests : IClassFixture<DentalClinicFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─── UC-S03: Calendar view ───────────────────────────────────────────────
+    // ─── UC-S03: Calendar ────────────────────────────────────────────────────
 
     [Fact]
     public async Task Calendar_AsSecretary_NotForbidden()

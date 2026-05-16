@@ -52,7 +52,7 @@
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="dc-avatar" style="background:var(--dc-teal);width:36px;height:36px;font-size:0.85rem;">
-                                            @doc.User?.FullName.Substring(0, 1).ToUpper()
+                                            @(doc.User?.FullName?.FirstOrDefault().ToString().ToUpper() ?? "D")
                                         </div>
                                         <div>
                                             <div class="fw-600">Dr. @doc.User?.FullName</div>
