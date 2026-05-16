@@ -24,6 +24,11 @@ namespace DentalClinic.Web.Services
         Task<bool> CancelAppointmentAsync(int appointmentId, string requestingUserId, bool isSecretary = false);
 
         /// <summary>
+        /// Reschedules an appointment to another slot if available and valid.
+        /// </summary>
+        Task<bool> RescheduleAppointmentAsync(int appointmentId, DateTime newAppointmentDate);
+
+        /// <summary>
         /// Marks an appointment as Completed. Used by the Doctor.
         /// </summary>
         Task<bool> CompleteAppointmentAsync(int appointmentId, int doctorId);

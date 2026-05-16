@@ -1,0 +1,72 @@
+@model DentalClinic.Web.ViewModels.PaymentRecordViewModel
+@using DentalClinic.Web.Models
+@{
+    ViewData["Title"] = "Record Payment";
+}
+
+<div class="container" style="max-width:760px;">
+    <div class="dc-page-header">
+        <h1><i class="bi bi-credit-card text-teal me-2"></i>Record Payment</h1>
+        <p class="text-muted small mb-0">Create a payment record and generate invoice data.</p>
+    </div>
+
+    <div class="dc-card p-4 mb-3">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="text-muted small">Patient</div>
+                <div class="fw-600">@Model.PatientName</div>
+            </div>
+            <div class="col-md-6">
+                <div class="text-muted small">Doctor</div>
+                <div class="fw-600">Dr. @Model.DoctorName</div>
+            </div>
+            <div class="col-md-6">
+                <div class="text-muted small">Service</div>
+                <div class="fw-600">@Model.ServiceName</div>
+            </div>
+            <div class="col-md-6">
+                <div class="text-muted small">Appointment Date</div>
+                <div class="fw-600">@Model.AppointmentDate.ToString("dd MMM yyyy HH:mm")</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dc-card p-4">
+        <form asp-action="RecordPayment" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2" role="alert"></div>
+
+            <input asp-for="AppointmentId" type="hidden" />
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Amount" class="form-label"></label>
+                    <div class="input-group">
+                        <span class="input-group-text">₺</span>
+                        <input asp-for="Amount" class="form-control" />
+                    </div>
+                    <div class="form-text">Suggested: ₺@Model.SuggestedFee.ToString("N2")</div>
+                    <span asp-validation-for="Amount" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="PaymentMethod" class="form-label"></label>
+                    <select asp-for="PaymentMethod" asp-items="Html.GetEnumSelectList<PaymentMethod>()" class="form-select"></select>
+                    <span asp-validation-for="PaymentMethod" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-dc-primary">
+                    <i class="bi bi-check2-circle me-1"></i>Save Payment
+                </button>
+                <a asp-action="Payments" class="btn btn-outline-secondary">Back to Payments</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

@@ -1,0 +1,135 @@
+@model DentalClinic.Web.ViewModels.PaymentDashboardViewModel
+@{
+    ViewData["Title"] = "Payments";
+}
+
+<div class="container-fluid px-4">
+    <div class="dc-page-header">
+        <h1><i class="bi bi-cash-coin text-teal me-2"></i>Payments</h1>
+        <p class="text-muted small mb-0">Revenue overview and invoice downloads</p>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon teal"><i class="bi bi-calendar-day"></i></div>
+                <div>
+                    <div class="dc-stat-value">₺@Model.TotalRevenueToday.ToString("N0")</div>
+                    <div class="dc-stat-label">Today's Revenue</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon green"><i class="bi bi-bar-chart-line"></i></div>
+                <div>
+                    <div class="dc-stat-value">₺@Model.TotalRevenueThisMonth.ToString("N0")</div>
+                    <div class="dc-stat-label">Monthly Revenue</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dc-stat-card">
+                <div class="dc-stat-icon amber"><i class="bi bi-hourglass-split"></i></div>
+                <div>
+                    <div class="dc-stat-value">@Model.PendingPaymentsCount</div>
+                    <div class="dc-stat-label">Pending Payments</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dc-card">
+        <div class="dc-card-header d-flex align-items-center">
+            <i class="bi bi-hourglass-split text-teal me-2"></i>
+            <h5 class="mb-0 fw-600">Pending Payments</h5>
+        </div>
+
+        @if (!Model.PendingPayments.Any())
+        {
+            <div class="p-4 text-center text-muted">No completed unpaid appointments.</div>
+        }
+        else
+        {
+            <div class="p-0">
+                <table class="dc-table">
+                    <thead>
+                        <tr>
+                            <th>Appointment</th>
+                            <th>Patient</th>
+                            <th>Doctor</th>
+                            <th>Service</th>
+                            <th>Fee</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var appt in Model.PendingPayments)
+                        {
+                            <tr>
+                                <td class="text-muted small">@appt.AppointmentDate.ToString("dd MMM yyyy HH:mm")</td>
+                                <td>@appt.PatientName</td>
+                                <td>Dr. @appt.DoctorName</td>
+                                <td>@appt.ServiceName</td>
+                                <td class="fw-600">₺@appt.Fee.ToString("N2")</td>
+                                <td>
+                                    <a asp-action="RecordPayment" asp-route-appointmentId="@appt.AppointmentId" class="btn btn-sm btn-dc-primary">
+                                        <i class="bi bi-credit-card me-1"></i>Record Payment
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="dc-card mt-4">
+        <div class="dc-card-header d-flex align-items-center">
+            <i class="bi bi-receipt text-teal me-2"></i>
+            <h5 class="mb-0 fw-600">Recent Payments</h5>
+        </div>
+
+        @if (!Model.RecentPayments.Any())
+        {
+            <div class="p-4 text-center text-muted">No payment records yet.</div>
+        }
+        else
+        {
+            <div class="p-0">
+                <table class="dc-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice</th>
+                            <th>Patient</th>
+                            <th>Doctor</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                            <th>Paid At</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var payment in Model.RecentPayments)
+                        {
+                            <tr>
+                                <td class="fw-600">@payment.InvoiceNumber</td>
+                                <td>@payment.PatientName</td>
+                                <td>Dr. @payment.DoctorName</td>
+                                <td class="fw-600">₺@payment.Amount.ToString("N2")</td>
+                                <td>@payment.Method</td>
+                                <td class="text-muted small">@payment.PaidAt.ToString("dd MMM yyyy HH:mm")</td>
+                                <td>
+                                    <a asp-action="PrintInvoice" asp-route-paymentId="@payment.PaymentId" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-filetype-pdf me-1"></i>Print PDF
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

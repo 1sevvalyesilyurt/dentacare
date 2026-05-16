@@ -1,0 +1,73 @@
+@model List<DentalClinic.Web.Models.DoctorLeave>
+@{
+    ViewData["Title"] = "Doctor Leave Management";
+}
+
+<div class="container-fluid px-4">
+    <div class="dc-page-header d-flex align-items-center justify-content-between">
+        <div>
+            <h1><i class="bi bi-calendar-x text-teal me-2"></i>Doctor Leaves</h1>
+            <p class="text-muted small mb-0">@Model.Count total leave record(s)</p>
+        </div>
+        <a asp-action="Doctors" class="btn btn-dc-primary">
+            <i class="bi bi-person-badge me-1"></i>Go To Doctors
+        </a>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="dc-card p-5 text-center">
+            <i class="bi bi-calendar2-x" style="font-size:3rem;color:var(--dc-muted);"></i>
+            <h5 class="mt-3 fw-600">No leave records found</h5>
+            <p class="text-muted mb-3">Use the Doctors page to add a leave period for a doctor.</p>
+            <a asp-action="Doctors" class="btn btn-dc-primary">Open Doctors</a>
+        </div>
+    }
+    else
+    {
+        <div class="dc-card">
+            <div class="p-0">
+                <table class="dc-table">
+                    <thead>
+                        <tr>
+                            <th>Doctor</th>
+                            <th>Specialty</th>
+                            <th>Leave Dates</th>
+                            <th>Days</th>
+                            <th>Reason</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var leave in Model)
+                        {
+                            var totalDays = (leave.EndDate.Date - leave.StartDate.Date).Days + 1;
+                            <tr>
+                                <td class="fw-600">Dr. @leave.Doctor?.User?.FullName</td>
+                                <td class="text-muted small">@leave.Doctor?.Specialty</td>
+                                <td>
+                                    @leave.StartDate.ToString("dd MMM yyyy")
+                                    <span class="text-muted">-</span>
+                                    @leave.EndDate.ToString("dd MMM yyyy")
+                                </td>
+                                <td>
+                                    <span class="badge-confirmed">@totalDays day(s)</span>
+                                </td>
+                                <td class="text-muted small">@(string.IsNullOrWhiteSpace(leave.Reason) ? "-" : leave.Reason)</td>
+                                <td>
+                                    <form asp-action="DeleteLeave" asp-route-id="@leave.LeaveId" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                onclick="return confirm('Delete this leave record for Dr. @leave.Doctor?.User?.FullName?')">
+                                            <i class="bi bi-trash me-1"></i>Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
