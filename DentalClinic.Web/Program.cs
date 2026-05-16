@@ -142,7 +142,7 @@ builder.Services.AddControllersWithViews();
 // ═══════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.UseDeveloperExceptionPage();
 }
@@ -208,7 +208,12 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = services.GetRequiredService<AppDbContext>();
-        db.Database.Migrate(); // Apply any pending EF migrations
+        // InMemory (used in tests) doesn't support migrations — skip and just ensure
+        // the schema exists. Relational providers (SQLite, Postgres…) use Migrate().
+        if (db.Database.IsRelational())
+            db.Database.Migrate();
+        else
+            db.Database.EnsureCreated();
 
         await SeedDataAsync(services, builder.Configuration);
     }

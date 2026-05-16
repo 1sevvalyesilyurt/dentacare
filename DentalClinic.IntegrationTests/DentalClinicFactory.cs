@@ -52,8 +52,12 @@ public class DentalClinicFactory : WebApplicationFactory<Program>
                 .ToList();
             foreach (var t in optCfgTypes) services.RemoveAll(t);
 
+            // Capture the DB name ONCE — all DbContext instances in this factory
+            // share the same InMemory store. If the GUID were inside the lambda it
+            // would produce a new (empty) database on every context creation.
+            var dbName = "IntegrationTestDb_" + Guid.NewGuid();
             services.AddDbContext<AppDbContext>(options =>
-                options.UseInMemoryDatabase("IntegrationTestDb_" + Guid.NewGuid()));
+                options.UseInMemoryDatabase(dbName));
 
             // Add fake auth scheme and make it the default so the TestAuthHandler
             // takes priority over the Identity cookie scheme for all auth decisions.
