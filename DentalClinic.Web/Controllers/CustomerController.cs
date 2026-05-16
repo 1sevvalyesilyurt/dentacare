@@ -7,10 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DentalClinic.Web.Controllers
 {
-    /// <summary>
-    /// Dedicated dashboard for the Customer (Patient) role.
-    /// Previously spread across AppointmentController — now has its own home.
-    /// </summary>
     [Authorize(Roles = "Customer")]
     public class CustomerController : Controller
     {
@@ -23,13 +19,15 @@ namespace DentalClinic.Web.Controllers
             _userManager = userManager;
         }
 
+        private CancellationToken ct => HttpContext.RequestAborted;
+
         // GET /Customer/Dashboard
         public async Task<IActionResult> Dashboard()
         {
-            var user = await _userManager.GetUserAsync(User);
+            var user     = await _userManager.GetUserAsync(User);
             var customer = await _db.Customers
                 .Include(c => c.Notifications)
-                .FirstOrDefaultAsync(c => c.UserId == user!.Id);
+                .FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
 
             if (customer == null) return RedirectToAction("Register", "Account");
 
@@ -41,19 +39,19 @@ namespace DentalClinic.Web.Controllers
                          && a.Status != AppointmentStatus.Cancelled)
                 .OrderBy(a => a.AppointmentDate)
                 .Take(5)
-                .ToListAsync();
+                .ToListAsync(ct);
 
-            var pastCount = await _db.Appointments
+            var pastCount  = await _db.Appointments
                 .CountAsync(a => a.CustomerId == customer.CustomerId
-                              && a.Status == AppointmentStatus.Completed);
+                              && a.Status == AppointmentStatus.Completed, ct);
 
             var totalSpent = await _db.Payments
                 .Include(p => p.Appointment)
                 .Where(p => p.Appointment!.CustomerId == customer.CustomerId)
-                .SumAsync(p => (decimal?)p.Amount) ?? 0;
+                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0;
 
             var unreadCount = await _db.Notifications
-                .CountAsync(n => n.CustomerId == customer.CustomerId && !n.IsRead);
+                .CountAsync(n => n.CustomerId == customer.CustomerId && !n.IsRead, ct);
 
             ViewBag.PatientName  = user!.FullName;
             ViewBag.PastCount    = pastCount;
@@ -63,14 +61,12 @@ namespace DentalClinic.Web.Controllers
             return View(upcoming);
         }
 
-        // ─── UC-C08: Payment History ──────────────────────────────────────────
-
-        // GET /Customer/PaymentHistory
+        // GET /Customer/PaymentHistory (UC-C08)
         public async Task<IActionResult> PaymentHistory()
         {
-            var user = await _userManager.GetUserAsync(User);
+            var user     = await _userManager.GetUserAsync(User);
             var customer = await _db.Customers
-                .FirstOrDefaultAsync(c => c.UserId == user!.Id);
+                .FirstOrDefaultAsync(c => c.UserId == user!.Id, ct);
 
             if (customer == null) return RedirectToAction("Register", "Account");
 
@@ -81,7 +77,7 @@ namespace DentalClinic.Web.Controllers
                     .ThenInclude(a => a!.Service)
                 .Where(p => p.Appointment!.CustomerId == customer.CustomerId)
                 .OrderByDescending(p => p.PaidAt)
-                .ToListAsync();
+                .ToListAsync(ct);
 
             ViewBag.TotalSpent  = payments.Sum(p => p.Amount);
             ViewBag.PatientName = user!.FullName;
@@ -89,26 +85,22 @@ namespace DentalClinic.Web.Controllers
             return View(payments);
         }
 
-        // ─── UC-C09: Edit Profile ──────────────────────────────────────────────
-
-        // GET /Customer/EditProfile
+        // GET /Customer/EditProfile (UC-C09)
         [HttpGet]
         public async Task<IActionResult> EditProfile()
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null) return RedirectToAction("Login", "Account");
 
-            var vm = new ViewModels.EditProfileViewModel
+            return View(new ViewModels.EditProfileViewModel
             {
                 FullName    = user.FullName,
                 PhoneNumber = user.PhoneNumber,
                 DateOfBirth = user.DateOfBirth
-            };
-
-            return View(vm);
+            });
         }
 
-        // POST /Customer/EditProfile
+        // POST /Customer/EditProfile (UC-C09)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditProfile(ViewModels.EditProfileViewModel model)
@@ -122,11 +114,9 @@ namespace DentalClinic.Web.Controllers
                                     || !string.IsNullOrWhiteSpace(model.NewPassword)
                                     || !string.IsNullOrWhiteSpace(model.ConfirmNewPassword);
 
-            // ── 1. Password change first (fail fast before touching profile) ──
+            // 1. Password change first — fail fast before touching profile
             if (wantsPasswordChange)
             {
-                // IValidatableObject already checked all-or-nothing + match,
-                // so here we just attempt the actual change.
                 var pwResult = await _userManager.ChangePasswordAsync(
                     user, model.CurrentPassword!, model.NewPassword!);
 
@@ -138,7 +128,7 @@ namespace DentalClinic.Web.Controllers
                 }
             }
 
-            // ── 2. Update personal info only after password succeeds ──────────
+            // 2. Update personal info
             user.FullName    = model.FullName;
             user.PhoneNumber = model.PhoneNumber;
             user.DateOfBirth = model.DateOfBirth;

@@ -2,7 +2,7 @@
 @using DentalClinic.Web.Models
 @{
     ViewData["Title"] = "Admin Dashboard";
-    var today = DateTime.Today;
+    var today = DateTime.UtcNow.Date;
 }
 
 <div class="container-fluid px-4">

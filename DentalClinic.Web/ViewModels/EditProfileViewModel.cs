@@ -28,7 +28,7 @@ namespace DentalClinic.Web.ViewModels
         [Display(Name = "Current Password")]
         public string? CurrentPassword { get; set; }
 
-        [StringLength(100, MinimumLength = 6)]
+        [StringLength(100, MinimumLength = 8)]
         [DataType(DataType.Password)]
         [Display(Name = "New Password")]
         public string? NewPassword { get; set; }

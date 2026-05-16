@@ -36,6 +36,9 @@ namespace DentalClinic.Web.Controllers
             _userManager = userManager;
         }
 
+        // Propagates request cancellation to all async DB calls in this controller
+        private CancellationToken ct => HttpContext.RequestAborted;
+
         // GET /Secretary/Dashboard — Overview stats
         public async Task<IActionResult> Dashboard()
         {
@@ -45,9 +48,9 @@ namespace DentalClinic.Web.Controllers
                 .CountAsync(a => a.AppointmentDate.Date == today
                              && a.Status != AppointmentStatus.Cancelled);
             ViewBag.PendingPayments = await _db.Appointments
-                .CountAsync(a => a.Status == AppointmentStatus.Completed && a.Payment == null);
-            ViewBag.TotalDoctors = await _db.Doctors.CountAsync(d => d.IsActive);
-            ViewBag.TotalCustomers = await _db.Customers.CountAsync();
+                .CountAsync(a => a.Status == AppointmentStatus.Completed && a.Payment == null, ct);
+            ViewBag.TotalDoctors = await _db.Doctors.CountAsync(d => d.IsActive, ct);
+            ViewBag.TotalCustomers = await _db.Customers.CountAsync(ct);
 
             var recentAppointments = await _db.Appointments
                 .Include(a => a.Customer!.User)
@@ -55,7 +58,7 @@ namespace DentalClinic.Web.Controllers
                 .Include(a => a.Service)
                 .OrderByDescending(a => a.CreatedAt)
                 .Take(10)
-                .ToListAsync();
+                .ToListAsync(ct);
 
             return View(recentAppointments);
         }
@@ -63,7 +66,7 @@ namespace DentalClinic.Web.Controllers
         // GET /Secretary/Calendar — All-doctors calendar (UC-S03)
         public async Task<IActionResult> Calendar(DateTime? date)
         {
-            var target = date?.Date ?? DateTime.Today;
+            var target = date?.Date ?? DateTime.UtcNow.Date;
             var appointments = await _db.Appointments
                 .Include(a => a.Customer!.User)
                 .Include(a => a.Doctor!.User)
@@ -73,7 +76,7 @@ namespace DentalClinic.Web.Controllers
                          && a.Status != AppointmentStatus.Cancelled)
                 .OrderBy(a => a.AppointmentDate)
                 .ThenBy(a => a.Doctor!.User!.FullName)
-                .ToListAsync();
+                .ToListAsync(ct);
 
             ViewBag.SelectedDate = target;
             return View(appointments);
@@ -99,7 +102,7 @@ namespace DentalClinic.Web.Controllers
             }
 
             // Verify the submitted userId belongs to a real Customer record
-            var customerExists = await _db.Customers.AnyAsync(c => c.UserId == customerUserId);
+            var customerExists = await _db.Customers.AnyAsync(c => c.UserId == customerUserId, ct);
             if (!customerExists)
             {
                 ModelState.AddModelError(string.Empty, "Please select a valid customer.");
@@ -118,7 +121,7 @@ namespace DentalClinic.Web.Controllers
             // Tag as manually created by the secretary
             var secretary = await _userManager.GetUserAsync(User);
             appointment.CreatedByUserId = secretary!.Id;
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
 
             TempData["SuccessMessage"] = "Appointment created successfully.";
             return RedirectToAction(nameof(Calendar));
@@ -182,7 +185,7 @@ namespace DentalClinic.Web.Controllers
             // Keep the current appointment time selectable when rescheduling the same record.
             if (appointmentId.HasValue)
             {
-                var appt = await _db.Appointments.FirstOrDefaultAsync(a => a.AppointmentId == appointmentId.Value);
+                var appt = await _db.Appointments.FirstOrDefaultAsync(a => a.AppointmentId == appointmentId.Value, ct);
                 if (appt != null && appt.DoctorId == doctorId && appt.AppointmentDate.Date == date.Date)
                 {
                     var current = appt.AppointmentDate.ToString("HH:mm");
@@ -270,7 +273,7 @@ namespace DentalClinic.Web.Controllers
                 .Include(p => p.Appointment!.Customer!.User)
                 .Include(p => p.Appointment!.Doctor!.User)
                 .Include(p => p.Appointment!.Service)
-                .FirstOrDefaultAsync(p => p.PaymentId == paymentId);
+                .FirstOrDefaultAsync(p => p.PaymentId == paymentId, ct);
 
             if (payment == null || payment.Appointment == null)
                 return NotFound();
@@ -335,7 +338,7 @@ namespace DentalClinic.Web.Controllers
                 .Include(a => a.Customer!.User)
                 .Include(a => a.Doctor!.User)
                 .Include(a => a.Service)
-                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId);
+                .FirstOrDefaultAsync(a => a.AppointmentId == appointmentId, ct);
 
             if (appt == null) return NotFound();
             if (appt.Status != AppointmentStatus.Completed)
@@ -384,14 +387,14 @@ namespace DentalClinic.Web.Controllers
                 .Include(c => c.User)
                 .Include(c => c.Appointments)
                 .OrderBy(c => c.User!.FullName)
-                .ToListAsync();
+                .ToListAsync(ct);
             return View(customers);
         }
 
         // GET /Secretary/Services — Service management (UC-S10)
         public async Task<IActionResult> Services()
         {
-            var services = await _db.Services.OrderBy(s => s.Name).ToListAsync();
+            var services = await _db.Services.OrderBy(s => s.Name).ToListAsync(ct);
             return View(services);
         }
 
@@ -406,7 +409,7 @@ namespace DentalClinic.Web.Controllers
                 return RedirectToAction(nameof(Services));
             }
 
-            var exists = await _db.Services.AnyAsync(s => s.Name.ToLower() == model.Name.ToLower());
+            var exists = await _db.Services.AnyAsync(s => s.Name.ToLower() == model.Name.ToLower(), ct);
             if (exists)
             {
                 TempData["ErrorMessage"] = "A service with the same name already exists.";
@@ -422,7 +425,7 @@ namespace DentalClinic.Web.Controllers
                 IsActive = true
             });
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             TempData["SuccessMessage"] = "Service added successfully.";
             return RedirectToAction(nameof(Services));
         }
@@ -438,11 +441,11 @@ namespace DentalClinic.Web.Controllers
                 return RedirectToAction(nameof(Services));
             }
 
-            var service = await _db.Services.FirstOrDefaultAsync(s => s.ServiceId == id);
+            var service = await _db.Services.FirstOrDefaultAsync(s => s.ServiceId == id, ct);
             if (service == null) return NotFound();
 
             var duplicateName = await _db.Services
-                .AnyAsync(s => s.ServiceId != id && s.Name.ToLower() == model.Name.ToLower());
+                .AnyAsync(s => s.ServiceId != id && s.Name.ToLower() == model.Name.ToLower(), ct);
             if (duplicateName)
             {
                 TempData["ErrorMessage"] = "Another service with this name already exists.";
@@ -454,7 +457,7 @@ namespace DentalClinic.Web.Controllers
             service.BaseFee = model.BaseFee;
             service.DurationMinutes = model.DurationMinutes;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             TempData["SuccessMessage"] = "Service updated successfully.";
             return RedirectToAction(nameof(Services));
         }
@@ -464,11 +467,11 @@ namespace DentalClinic.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleService(int id)
         {
-            var service = await _db.Services.FirstOrDefaultAsync(s => s.ServiceId == id);
+            var service = await _db.Services.FirstOrDefaultAsync(s => s.ServiceId == id, ct);
             if (service == null) return NotFound();
 
             service.IsActive = !service.IsActive;
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
 
             TempData["SuccessMessage"] =
                 $"Service '{service.Name}' is now {(service.IsActive ? "Active" : "Inactive")}.";
@@ -484,7 +487,7 @@ namespace DentalClinic.Web.Controllers
                 .Include(d => d.User)
                 .Include(d => d.Appointments)
                 .OrderBy(d => d.User!.FullName)
-                .ToListAsync();
+                .ToListAsync(ct);
             return View(doctors);
         }
 
@@ -542,7 +545,7 @@ namespace DentalClinic.Web.Controllers
             };
 
             _db.Doctors.Add(doctor);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
 
             TempData["SuccessMessage"] = $"Dr. {model.FullName} has been added successfully. Login: {model.Email}";
             return RedirectToAction(nameof(Doctors));
@@ -553,14 +556,14 @@ namespace DentalClinic.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleDoctor(int id)
         {
-            var doctor = await _db.Doctors.Include(d => d.User).FirstOrDefaultAsync(d => d.DoctorId == id);
+            var doctor = await _db.Doctors.Include(d => d.User).FirstOrDefaultAsync(d => d.DoctorId == id, ct);
             if (doctor == null) return NotFound();
 
             doctor.IsActive = !doctor.IsActive;
             if (doctor.User != null)
                 doctor.User.IsActive = doctor.IsActive;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             TempData["SuccessMessage"] = $"Dr. {doctor.User?.FullName} is now {(doctor.IsActive ? "Active" : "Deactivated")}.";
             return RedirectToAction(nameof(Doctors));
         }
@@ -575,7 +578,7 @@ namespace DentalClinic.Web.Controllers
                 .Include(l => l.Doctor!)
                     .ThenInclude(d => d.User)
                 .OrderByDescending(l => l.StartDate)
-                .ToListAsync();
+                .ToListAsync(ct);
 
             return View(leaves);
         }
@@ -586,7 +589,7 @@ namespace DentalClinic.Web.Controllers
         {
             var doctor = await _db.Doctors
                 .Include(d => d.User)
-                .FirstOrDefaultAsync(d => d.DoctorId == doctorId);
+                .FirstOrDefaultAsync(d => d.DoctorId == doctorId, ct);
 
             if (doctor == null)
             {
@@ -598,8 +601,8 @@ namespace DentalClinic.Web.Controllers
             return View(new DoctorLeave
             {
                 DoctorId = doctorId,
-                StartDate = DateTime.Today,
-                EndDate = DateTime.Today
+                StartDate = DateTime.UtcNow.Date,
+                EndDate   = DateTime.UtcNow.Date
             });
         }
 
@@ -610,7 +613,7 @@ namespace DentalClinic.Web.Controllers
         {
             var doctor = await _db.Doctors
                 .Include(d => d.User)
-                .FirstOrDefaultAsync(d => d.DoctorId == model.DoctorId);
+                .FirstOrDefaultAsync(d => d.DoctorId == model.DoctorId, ct);
 
             if (doctor == null)
             {
@@ -635,7 +638,7 @@ namespace DentalClinic.Web.Controllers
                 Reason = model.Reason
             });
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
             TempData["SuccessMessage"] = $"Leave added for Dr. {doctor.User?.FullName}.";
             return RedirectToAction(nameof(DoctorLeaves));
         }
@@ -648,7 +651,7 @@ namespace DentalClinic.Web.Controllers
             var leave = await _db.DoctorLeaves
                 .Include(l => l.Doctor!)
                     .ThenInclude(d => d.User)
-                .FirstOrDefaultAsync(l => l.LeaveId == id);
+                .FirstOrDefaultAsync(l => l.LeaveId == id, ct);
 
             if (leave == null)
             {
@@ -658,7 +661,7 @@ namespace DentalClinic.Web.Controllers
 
             var doctorName = leave.Doctor?.User?.FullName ?? "Doctor";
             _db.DoctorLeaves.Remove(leave);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
 
             TempData["SuccessMessage"] = $"Leave deleted for Dr. {doctorName}.";
             return RedirectToAction(nameof(DoctorLeaves));
@@ -671,7 +674,7 @@ namespace DentalClinic.Web.Controllers
                 .Include(a => a.Customer!.User)
                 .Include(a => a.Doctor!.User)
                 .Include(a => a.Service)
-                .FirstOrDefaultAsync(a => a.AppointmentId == model.AppointmentId);
+                .FirstOrDefaultAsync(a => a.AppointmentId == model.AppointmentId, ct);
 
             if (appt == null) return false;
 
@@ -709,10 +712,10 @@ namespace DentalClinic.Web.Controllers
         private async Task PopulateBookingDropdowns()
         {
             ViewBag.Doctors = await _db.Doctors.Include(d => d.User)
-                .Where(d => d.IsActive).ToListAsync();
+                .Where(d => d.IsActive).ToListAsync(ct);
             ViewBag.Services = await _db.Services
-                .Where(s => s.IsActive).ToListAsync();
-            ViewBag.Customers = await _db.Customers.Include(c => c.User).ToListAsync();
+                .Where(s => s.IsActive).ToListAsync(ct);
+            ViewBag.Customers = await _db.Customers.Include(c => c.User).ToListAsync(ct);
         }
     }
 }

@@ -416,6 +416,100 @@ public class BookingServiceTests
         db.SaveChanges();
     }
 
+    // ─── RescheduleAppointmentAsync ──────────────────────────────────────────
+
+    [Fact]
+    public async Task RescheduleAppointment_ValidSlot_UpdatesDateAndResetsSentFlag()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, "doc-r1", doctorId: 20,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(17), slotMinutes: 30);
+        SeedCustomer(db, "cust-r1", customerId: 30);
+        SeedService(db, serviceId: 5);
+
+        var originalDate = DateTime.UtcNow.AddDays(3).Date.AddHours(9);
+        db.Appointments.Add(new Appointment
+        {
+            AppointmentId   = 500,
+            DoctorId        = 20,
+            CustomerId      = 30,
+            ServiceId       = 5,
+            AppointmentDate = originalDate,
+            Status          = AppointmentStatus.Confirmed,
+            ReminderSent    = true,
+            Fee             = 200
+        });
+        await db.SaveChangesAsync();
+
+        var svc        = new BookingService(db, NullLogger<BookingService>.Instance);
+        var newDate    = DateTime.UtcNow.AddDays(4).Date.AddHours(10);
+        var result     = await svc.RescheduleAppointmentAsync(500, newDate);
+
+        Assert.True(result);
+        var updated = await db.Appointments.FindAsync(500);
+        Assert.Equal(newDate, updated!.AppointmentDate);
+        Assert.False(updated.ReminderSent); // reminder must be reset for new time
+    }
+
+    [Fact]
+    public async Task RescheduleAppointment_SlotConflict_ReturnsFalse()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, "doc-r2", doctorId: 21,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(17), slotMinutes: 30);
+        SeedCustomer(db, "cust-r2", customerId: 31);
+        SeedService(db, serviceId: 6);
+
+        var targetDate = DateTime.UtcNow.AddDays(3).Date.AddHours(10);
+
+        // Original appointment
+        db.Appointments.Add(new Appointment
+        {
+            AppointmentId   = 501,
+            DoctorId        = 21, CustomerId = 31, ServiceId = 6,
+            AppointmentDate = DateTime.UtcNow.AddDays(3).Date.AddHours(9),
+            Status          = AppointmentStatus.Confirmed, Fee = 200
+        });
+        // Blocking appointment at the target slot
+        db.Appointments.Add(new Appointment
+        {
+            AppointmentId   = 502,
+            DoctorId        = 21, CustomerId = 31, ServiceId = 6,
+            AppointmentDate = targetDate,
+            Status          = AppointmentStatus.Confirmed, Fee = 200
+        });
+        await db.SaveChangesAsync();
+
+        var svc    = new BookingService(db, NullLogger<BookingService>.Instance);
+        var result = await svc.RescheduleAppointmentAsync(501, targetDate);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task RescheduleAppointment_CompletedAppointment_ReturnsFalse()
+    {
+        using var db = CreateDb();
+        SeedDoctor(db, "doc-r3", doctorId: 22,
+            start: TimeSpan.FromHours(9), end: TimeSpan.FromHours(17), slotMinutes: 30);
+        SeedCustomer(db, "cust-r3", customerId: 32);
+        SeedService(db, serviceId: 7);
+
+        db.Appointments.Add(new Appointment
+        {
+            AppointmentId   = 503,
+            DoctorId        = 22, CustomerId = 32, ServiceId = 7,
+            AppointmentDate = DateTime.UtcNow.AddDays(-1),
+            Status          = AppointmentStatus.Completed, Fee = 200
+        });
+        await db.SaveChangesAsync();
+
+        var svc    = new BookingService(db, NullLogger<BookingService>.Instance);
+        var result = await svc.RescheduleAppointmentAsync(503, DateTime.UtcNow.AddDays(3).Date.AddHours(9));
+
+        Assert.False(result);
+    }
+
     private static (int customerId, int apptId) SeedAppointmentWithCustomer(
         AppDbContext db,
         string ownerUserId,

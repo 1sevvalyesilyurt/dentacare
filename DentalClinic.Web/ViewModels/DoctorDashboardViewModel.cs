@@ -13,7 +13,7 @@ namespace DentalClinic.Web.ViewModels
         public string Specialty { get; set; } = string.Empty;
         public decimal CommissionRate { get; set; }
 
-        public DateTime SelectedDate { get; set; } = DateTime.Today;
+        public DateTime SelectedDate { get; set; } = DateTime.UtcNow.Date;
 
         public List<AppointmentSummary> TodayAppointments { get; set; } = new();
         public List<AppointmentSummary> WeekAppointments { get; set; } = new();
