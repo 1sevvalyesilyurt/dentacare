@@ -1,0 +1,193 @@
+@model DentalClinic.Web.ViewModels.EditProfileViewModel
+@{
+    ViewData["Title"] = "Edit Profile";
+}
+
+<div class="container-fluid px-4">
+
+    <!-- Page Header -->
+    <div class="dc-page-header d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+            <h1>
+                <i class="bi bi-person-gear text-teal me-2"></i>
+                Edit Profile
+            </h1>
+            <p class="text-muted small mb-0">Update your personal information and password</p>
+        </div>
+        <a asp-controller="Customer" asp-action="Dashboard" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- ── Personal Info ─────────────────────────────────────────────── -->
+        <div class="col-lg-6">
+            <div class="dc-card h-100">
+                <div class="dc-card-header d-flex align-items-center gap-2">
+                    <i class="bi bi-person-fill text-teal"></i>
+                    <h5 class="mb-0 fw-600">Personal Information</h5>
+                </div>
+                <div class="p-4">
+                    <form asp-action="EditProfile" method="post" id="profile-form">
+                        @Html.AntiForgeryToken()
+
+                        <!-- Full Name -->
+                        <div class="mb-4">
+                            <label asp-for="FullName" class="form-label fw-600">
+                                <i class="bi bi-person me-1 text-teal"></i>Full Name
+                            </label>
+                            <input asp-for="FullName" class="form-control dc-input" placeholder="Enter your full name" />
+                            <span asp-validation-for="FullName" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Phone Number -->
+                        <div class="mb-4">
+                            <label asp-for="PhoneNumber" class="form-label fw-600">
+                                <i class="bi bi-telephone me-1 text-teal"></i>Phone Number
+                            </label>
+                            <input asp-for="PhoneNumber" class="form-control dc-input" placeholder="+90 5XX XXX XX XX" />
+                            <span asp-validation-for="PhoneNumber" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Date of Birth -->
+                        <div class="mb-4">
+                            <label asp-for="DateOfBirth" class="form-label fw-600">
+                                <i class="bi bi-calendar-date me-1 text-teal"></i>Date of Birth
+                            </label>
+                            <input asp-for="DateOfBirth" type="date" class="form-control dc-input" />
+                            <span asp-validation-for="DateOfBirth" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Divider -->
+                        <hr style="border-color:var(--dc-border);margin:1.5rem 0;" />
+
+                        <!-- Password Change Section -->
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <i class="bi bi-lock-fill text-amber"></i>
+                                <span class="fw-600">Change Password</span>
+                                <span class="text-muted small">(leave blank to keep current)</span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="CurrentPassword" class="form-label fw-600">Current Password</label>
+                                <div class="input-group">
+                                    <input asp-for="CurrentPassword" type="password" class="form-control dc-input"
+                                           id="currentPwInput" placeholder="Enter current password" />
+                                    <button class="btn" type="button" onclick="togglePw('currentPwInput', this)"
+                                            style="border:1px solid var(--dc-border);background:var(--dc-navy);color:var(--dc-muted);">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                                <span asp-validation-for="CurrentPassword" class="text-danger small"></span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="NewPassword" class="form-label fw-600">New Password</label>
+                                <div class="input-group">
+                                    <input asp-for="NewPassword" type="password" class="form-control dc-input"
+                                           id="newPwInput" placeholder="Min. 6 characters" />
+                                    <button class="btn" type="button" onclick="togglePw('newPwInput', this)"
+                                            style="border:1px solid var(--dc-border);background:var(--dc-navy);color:var(--dc-muted);">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                                <span asp-validation-for="NewPassword" class="text-danger small"></span>
+                            </div>
+
+                            <div class="mb-4">
+                                <label asp-for="ConfirmNewPassword" class="form-label fw-600">Confirm New Password</label>
+                                <div class="input-group">
+                                    <input asp-for="ConfirmNewPassword" type="password" class="form-control dc-input"
+                                           id="confirmPwInput" placeholder="Repeat new password" />
+                                    <button class="btn" type="button" onclick="togglePw('confirmPwInput', this)"
+                                            style="border:1px solid var(--dc-border);background:var(--dc-navy);color:var(--dc-muted);">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                                <span asp-validation-for="ConfirmNewPassword" class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <!-- Validation Summary -->
+                        <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+                        <button type="submit" class="btn btn-dc-primary w-100">
+                            <i class="bi bi-floppy me-2"></i>Save Changes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Info Panel ────────────────────────────────────────────────── -->
+        <div class="col-lg-6">
+            <div class="dc-card" style="background:linear-gradient(135deg,rgba(0,188,168,0.08),rgba(0,188,168,0.02));border:1px solid rgba(0,188,168,0.2);">
+                <div class="p-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <div style="width:64px;height:64px;border-radius:50%;background:var(--dc-teal);display:flex;align-items-center:center;justify-content:center;font-size:1.75rem;font-weight:700;color:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                            @User.Identity!.Name?.Substring(0, 1).ToUpper()
+                        </div>
+                        <div>
+                            <div class="fw-700 fs-5">@Model.FullName</div>
+                            <div class="text-muted small">@User.Identity.Name</div>
+                            <span class="badge mt-1" style="background:rgba(0,188,168,0.15);color:var(--dc-teal);border:1px solid rgba(0,188,168,0.3);font-size:.7rem;">
+                                Patient
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column gap-3">
+                        <div class="d-flex align-items-center gap-3 p-3" style="background:var(--dc-navy);border-radius:10px;">
+                            <i class="bi bi-telephone-fill text-teal fs-5"></i>
+                            <div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;">Phone</div>
+                                <div class="fw-600">@(string.IsNullOrEmpty(Model.PhoneNumber) ? "Not set" : Model.PhoneNumber)</div>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-3 p-3" style="background:var(--dc-navy);border-radius:10px;">
+                            <i class="bi bi-cake2-fill text-teal fs-5"></i>
+                            <div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;">Date of Birth</div>
+                                <div class="fw-600">
+                                    @(Model.DateOfBirth.HasValue
+                                        ? Model.DateOfBirth.Value.ToString("dd MMMM yyyy")
+                                        : "Not set")
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tips -->
+                    <div class="mt-4 p-3" style="background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.2);border-radius:10px;">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-info-circle-fill text-warning mt-1"></i>
+                            <div class="small text-muted">
+                                <strong style="color:#f0c040;">Password tip:</strong> Only fill in the password fields
+                                if you want to change your password. Leave them blank to keep your current password.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+    <script>
+        function togglePw(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        }
+    </script>
+}

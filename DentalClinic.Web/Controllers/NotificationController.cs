@@ -49,8 +49,17 @@ namespace DentalClinic.Web.Controllers
                 .OrderByDescending(n => n.CreatedAt)
                 .ToListAsync();
 
-            // Mark all as read on view
-            notifications.Where(n => !n.IsRead).ToList().ForEach(n => n.IsRead = true);
+            // Capture which notifications were unread BEFORE marking them as read,
+            // so the view can render "New" badges on first render while the navbar
+            // badge is already cleared for subsequent polls.
+            var unreadIds = notifications
+                .Where(n => !n.IsRead)
+                .Select(n => n.NotificationId)
+                .ToHashSet();
+
+            ViewBag.UnreadNotificationIds = unreadIds;
+
+            notifications.ForEach(n => n.IsRead = true);
             await _db.SaveChangesAsync();
 
             return View(notifications);

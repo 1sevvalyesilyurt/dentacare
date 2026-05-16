@@ -62,5 +62,97 @@ namespace DentalClinic.Web.Controllers
 
             return View(upcoming);
         }
+
+        // ─── UC-C08: Payment History ──────────────────────────────────────────
+
+        // GET /Customer/PaymentHistory
+        public async Task<IActionResult> PaymentHistory()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            var customer = await _db.Customers
+                .FirstOrDefaultAsync(c => c.UserId == user!.Id);
+
+            if (customer == null) return RedirectToAction("Register", "Account");
+
+            var payments = await _db.Payments
+                .Include(p => p.Appointment)
+                    .ThenInclude(a => a!.Doctor!.User)
+                .Include(p => p.Appointment)
+                    .ThenInclude(a => a!.Service)
+                .Where(p => p.Appointment!.CustomerId == customer.CustomerId)
+                .OrderByDescending(p => p.PaidAt)
+                .ToListAsync();
+
+            ViewBag.TotalSpent  = payments.Sum(p => p.Amount);
+            ViewBag.PatientName = user!.FullName;
+
+            return View(payments);
+        }
+
+        // ─── UC-C09: Edit Profile ──────────────────────────────────────────────
+
+        // GET /Customer/EditProfile
+        [HttpGet]
+        public async Task<IActionResult> EditProfile()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return RedirectToAction("Login", "Account");
+
+            var vm = new ViewModels.EditProfileViewModel
+            {
+                FullName    = user.FullName,
+                PhoneNumber = user.PhoneNumber,
+                DateOfBirth = user.DateOfBirth
+            };
+
+            return View(vm);
+        }
+
+        // POST /Customer/EditProfile
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditProfile(ViewModels.EditProfileViewModel model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return RedirectToAction("Login", "Account");
+
+            bool wantsPasswordChange = !string.IsNullOrWhiteSpace(model.CurrentPassword)
+                                    || !string.IsNullOrWhiteSpace(model.NewPassword)
+                                    || !string.IsNullOrWhiteSpace(model.ConfirmNewPassword);
+
+            // ── 1. Password change first (fail fast before touching profile) ──
+            if (wantsPasswordChange)
+            {
+                // IValidatableObject already checked all-or-nothing + match,
+                // so here we just attempt the actual change.
+                var pwResult = await _userManager.ChangePasswordAsync(
+                    user, model.CurrentPassword!, model.NewPassword!);
+
+                if (!pwResult.Succeeded)
+                {
+                    foreach (var e in pwResult.Errors)
+                        ModelState.AddModelError(nameof(model.CurrentPassword), e.Description);
+                    return View(model);
+                }
+            }
+
+            // ── 2. Update personal info only after password succeeds ──────────
+            user.FullName    = model.FullName;
+            user.PhoneNumber = model.PhoneNumber;
+            user.DateOfBirth = model.DateOfBirth;
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                foreach (var e in updateResult.Errors)
+                    ModelState.AddModelError(string.Empty, e.Description);
+                return View(model);
+            }
+
+            TempData["SuccessMessage"] = "Your profile has been updated successfully.";
+            return RedirectToAction(nameof(Dashboard));
+        }
     }
 }
