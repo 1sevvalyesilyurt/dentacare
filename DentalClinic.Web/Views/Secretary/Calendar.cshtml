@@ -2,7 +2,7 @@
 @using DentalClinic.Web.Models
 @{
     ViewData["Title"] = "Appointment Calendar";
-    var selectedDate = (DateTime)(ViewBag.SelectedDate ?? DateTime.Today);
+    var selectedDate = (DateTime)(ViewBag.SelectedDate ?? DateTime.UtcNow.Date);
 }
 
 <div class="container-fluid px-4">

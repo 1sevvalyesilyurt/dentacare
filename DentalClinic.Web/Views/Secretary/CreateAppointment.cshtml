@@ -26,7 +26,7 @@
 
             <div class="row g-3">
 
-                {{!-- Patient --}}
+                
                 <div class="col-12">
                     <label class="form-label fw-600">Patient <span class="text-danger">*</span></label>
                     <select name="customerUserId" class="form-select" required>
@@ -38,7 +38,7 @@
                     </select>
                 </div>
 
-                {{!-- Doctor --}}
+                
                 <div class="col-md-6">
                     <label asp-for="DoctorId" class="form-label fw-600">Doctor <span class="text-danger">*</span></label>
                     <select asp-for="DoctorId" class="form-select" id="sel-doctor" required>
@@ -51,7 +51,7 @@
                     <span asp-validation-for="DoctorId" class="text-danger small"></span>
                 </div>
 
-                {{!-- Service --}}
+                
                 <div class="col-md-6">
                     <label asp-for="ServiceId" class="form-label fw-600">Service <span class="text-danger">*</span></label>
                     <select asp-for="ServiceId" class="form-select" required>
@@ -64,7 +64,7 @@
                     <span asp-validation-for="ServiceId" class="text-danger small"></span>
                 </div>
 
-                {{!-- Date --}}
+                
                 <div class="col-md-6">
                     <label class="form-label fw-600">Date <span class="text-danger">*</span></label>
                     <input type="date" id="sel-date" class="form-control"
@@ -72,7 +72,7 @@
                            max="@DateTime.UtcNow.AddMonths(6).ToString("yyyy-MM-dd")" required />
                 </div>
 
-                {{!-- Time slot --}}
+                
                 <div class="col-md-6">
                     <label class="form-label fw-600">Time Slot <span class="text-danger">*</span></label>
                     <select id="sel-slot" class="form-select" disabled required>
@@ -82,7 +82,7 @@
                     <span asp-validation-for="AppointmentDate" class="text-danger small"></span>
                 </div>
 
-                {{!-- Patient note --}}
+                
                 <div class="col-12">
                     <label asp-for="PatientNote" class="form-label fw-600">Note (optional)</label>
                     <textarea asp-for="PatientNote" class="form-control" rows="2"

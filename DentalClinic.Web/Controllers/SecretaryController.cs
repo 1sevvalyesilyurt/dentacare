@@ -194,7 +194,7 @@ namespace DentalClinic.Web.Controllers
                 }
             }
 
-            return Json(slotTimes.OrderBy(t => t));
+            return Json(slotTimes.OrderBy(t => t).ToList());
         }
 
         // GET /Secretary/Payments — Revenue dashboard (UC-S08)

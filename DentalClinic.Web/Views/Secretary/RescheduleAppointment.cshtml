@@ -83,8 +83,15 @@
             if (!selectedDate) return;
 
             const url = `${slotsUrlBase}?doctorId=${doctorId}&date=${selectedDate}&appointmentId=${appointmentId}`;
-            const res = await fetch(url);
-            if (!res.ok) return;
+            let res;
+            try { res = await fetch(url); } catch {
+                timeSelect.innerHTML = '<option value="">Could not load slots — check connection</option>';
+                return;
+            }
+            if (!res.ok) {
+                timeSelect.innerHTML = '<option value="">Could not load slots — please try again</option>';
+                return;
+            }
 
             const slots = await res.json();
             const currentSelection = timeSelect.value;
