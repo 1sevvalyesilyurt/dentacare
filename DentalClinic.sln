@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DentalClinic.Tests", "Denta
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DentalClinic.IntegrationTests", "DentalClinic.IntegrationTests\DentalClinic.IntegrationTests.csproj", "{5B014813-C224-46F5-BF7C-3F95E2E88492}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DentalClinic.PlaywrightTests", "DentalClinic.PlaywrightTests\DentalClinic.PlaywrightTests.csproj", "{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{5B014813-C224-46F5-BF7C-3F95E2E88492}.Release|x64.Build.0 = Release|Any CPU
 		{5B014813-C224-46F5-BF7C-3F95E2E88492}.Release|x86.ActiveCfg = Release|Any CPU
 		{5B014813-C224-46F5-BF7C-3F95E2E88492}.Release|x86.Build.0 = Release|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Debug|x64.Build.0 = Debug|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Debug|x86.Build.0 = Debug|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Release|x64.ActiveCfg = Release|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Release|x64.Build.0 = Release|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Release|x86.ActiveCfg = Release|Any CPU
+		{0EDDB71E-A7FB-4CCB-BDE2-0B227B43DAED}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

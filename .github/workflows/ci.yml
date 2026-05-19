@@ -1,0 +1,187 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancel in-progress runs for the same branch/PR to avoid queued builds
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  # ─── Job 1: Release build + vulnerability scan ────────────────────────────
+  build:
+    name: 🔨 Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build --no-restore --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      - name: Vulnerability scan
+        run: |
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          if grep -q "has the following vulnerable" vuln.txt; then
+            echo "::error::Vulnerable NuGet packages detected — see vuln.txt"
+            exit 1
+          fi
+          echo "✅ No known vulnerabilities found."
+
+  # ─── Job 2: Unit + Integration tests (xUnit, in-memory DB) ───────────────
+  unit-integration:
+    name: 🧪 Unit & Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore & build
+        run: dotnet build --configuration Debug
+
+      - name: Unit tests — DentalClinic.Tests (55 tests)
+        run: |
+          dotnet test DentalClinic.Tests \
+            --no-build \
+            --configuration Debug \
+            --logger "trx;LogFileName=unit.trx" \
+            --results-directory TestResults \
+            --collect:"XPlat Code Coverage"
+
+      - name: Integration tests — DentalClinic.IntegrationTests (150 tests)
+        run: |
+          dotnet test DentalClinic.IntegrationTests \
+            --no-build \
+            --configuration Debug \
+            --logger "trx;LogFileName=integration.trx" \
+            --results-directory TestResults
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Unit & Integration Test Results
+          path: TestResults/*.trx
+          reporter: dotnet-trx
+
+      - name: Upload raw TRX artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-unit-integration
+          path: TestResults/
+          retention-days: 14
+
+  # ─── Job 3: Playwright E2E tests (real browser, real SQLite) ─────────────
+  playwright:
+    name: 🎭 Playwright E2E Tests
+    runs-on: ubuntu-latest
+    needs: build
+
+    env:
+      # Test-environment credentials — not production secrets
+      SeedSettings__DefaultSecretaryPassword: Admin@123
+      SeedSettings__PlaywrightDoctorPassword: Doctor@123!
+      SeedSettings__PlaywrightCustomerPassword: Customer@123!
+      # Force headless Chromium
+      BROWSER: chromium
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # Bump version when upgrading Microsoft.Playwright.NUnit package
+          key: playwright-${{ runner.os }}-1.49.0
+
+      - name: Restore & build
+        run: dotnet build --configuration Debug
+
+      - name: Install Playwright Chromium + OS dependencies
+        run: |
+          pwsh DentalClinic.PlaywrightTests/bin/Debug/net9.0/playwright.ps1 \
+            install chromium --with-deps
+
+      - name: Run Playwright E2E tests (58 tests)
+        run: |
+          dotnet test DentalClinic.PlaywrightTests \
+            --no-build \
+            --configuration Debug \
+            --logger "trx;LogFileName=playwright.trx" \
+            --results-directory TestResults
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Playwright E2E Test Results
+          path: TestResults/playwright.trx
+          reporter: dotnet-trx
+
+      - name: Upload raw TRX artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-playwright
+          path: TestResults/
+          retention-days: 14
+
+      # Playwright saves traces to this folder when a test fails
+      - name: Upload Playwright traces on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: playwright-traces/
+          if-no-files-found: ignore
+          retention-days: 7

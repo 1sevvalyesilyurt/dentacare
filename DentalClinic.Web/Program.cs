@@ -188,7 +188,9 @@ app.Use(async (context, next) =>
 
 app.UseStaticFiles();
 app.UseRouting();
-app.UseRateLimiter();
+// Skip rate limiting in Playwright E2E tests to avoid 429s from rapid login sequences
+if (!app.Environment.IsEnvironment("Playwright"))
+    app.UseRateLimiter();
 
 app.UseAuthentication(); // Must come before UseAuthorization
 app.UseAuthorization();
@@ -216,6 +218,9 @@ using (var scope = app.Services.CreateScope())
             db.Database.EnsureCreated();
 
         await SeedDataAsync(services, builder.Configuration);
+
+        if (app.Environment.IsEnvironment("Playwright"))
+            await SeedPlaywrightTestDataAsync(services, builder.Configuration);
     }
     catch (Exception ex)
     {
@@ -279,6 +284,63 @@ static async Task SeedDataAsync(IServiceProvider services, IConfiguration config
             new DentalClinic.Web.Models.Service { Name = "Orthodontic Consult",BaseFee = 300,  DurationMinutes = 30 },
             new DentalClinic.Web.Models.Service { Name = "Dental Implant Consult", BaseFee = 500, DurationMinutes = 45 }
         );
+        await db.SaveChangesAsync();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Playwright E2E seed — creates a test Doctor and Customer when running
+// in the "Playwright" environment so booking tests have required data.
+// ═══════════════════════════════════════════════════════════════════════════
+static async Task SeedPlaywrightTestDataAsync(IServiceProvider services, IConfiguration configuration)
+{
+    var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+    var db          = services.GetRequiredService<AppDbContext>();
+
+    const string doctorEmail = "testdoctor@dentacare.com";
+    if (await userManager.FindByEmailAsync(doctorEmail) == null)
+    {
+        var password = configuration["SeedSettings:PlaywrightDoctorPassword"] ?? "Doctor@123!";
+        var doctorUser = new ApplicationUser
+        {
+            UserName       = doctorEmail,
+            Email          = doctorEmail,
+            FullName       = "Test Doctor",
+            IsActive       = true,
+            CreatedAt      = DateTime.UtcNow,
+            EmailConfirmed = true,
+        };
+        await userManager.CreateAsync(doctorUser, password);
+        await userManager.AddToRoleAsync(doctorUser, "Doctor");
+
+        db.Doctors.Add(new DentalClinic.Web.Models.Doctor
+        {
+            UserId             = doctorUser.Id,
+            Specialty          = "General Dentistry",
+            IsActive           = true,
+            WorkingHoursStart  = new TimeSpan(9,  0, 0),
+            WorkingHoursEnd    = new TimeSpan(17, 0, 0),
+        });
+        await db.SaveChangesAsync();
+    }
+
+    const string customerEmail = "testcustomer@test.com";
+    if (await userManager.FindByEmailAsync(customerEmail) == null)
+    {
+        var password = configuration["SeedSettings:PlaywrightCustomerPassword"] ?? "Customer@123!";
+        var customerUser = new ApplicationUser
+        {
+            UserName       = customerEmail,
+            Email          = customerEmail,
+            FullName       = "Test Customer",
+            IsActive       = true,
+            CreatedAt      = DateTime.UtcNow,
+            EmailConfirmed = true,
+        };
+        await userManager.CreateAsync(customerUser, password);
+        await userManager.AddToRoleAsync(customerUser, "Customer");
+
+        db.Customers.Add(new DentalClinic.Web.Models.Customer { UserId = customerUser.Id });
         await db.SaveChangesAsync();
     }
 }
