@@ -1,0 +1,21 @@
+**/.git
+**/.github
+**/bin
+**/obj
+**/logs
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/playwright-traces
+**/TestResults
+
+# Test projects — not needed in the production image
+DentalClinic.Tests/
+DentalClinic.IntegrationTests/
+DentalClinic.PlaywrightTests/
+
+# Docs & config not needed at runtime
+*.md
+prometheus/
+grafana/
+docker-compose*.yml

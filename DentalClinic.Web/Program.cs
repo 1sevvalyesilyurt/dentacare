@@ -4,6 +4,7 @@ using DentalClinic.Web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Prometheus;
 using Serilog;
 using Serilog.Events;
 using System.Threading.RateLimiting;
@@ -188,6 +189,8 @@ app.Use(async (context, next) =>
 
 app.UseStaticFiles();
 app.UseRouting();
+// HTTP metrics must come after UseRouting so route labels are populated
+app.UseHttpMetrics();
 // Skip rate limiting in Playwright E2E tests to avoid 429s from rapid login sequences
 if (!app.Environment.IsEnvironment("Playwright"))
     app.UseRateLimiter();
@@ -196,6 +199,8 @@ app.UseAuthentication(); // Must come before UseAuthorization
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
+// Prometheus scrape endpoint — restrict to internal network in production
+app.MapMetrics("/metrics");
 
 app.MapControllerRoute(
     name: "default",
