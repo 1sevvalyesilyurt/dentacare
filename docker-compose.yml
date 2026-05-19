@@ -6,15 +6,11 @@ services:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      # Override to store SQLite in the mounted volume
       ConnectionStrings__DefaultConnection: "Data Source=/app/data/DentalClinic.db"
-      # Set a strong password — override via .env file or shell export
       SeedSettings__DefaultSecretaryPassword: ${SECRETARY_PASSWORD:-ChangeMe@2026!}
     volumes:
       - dentacare-data:/app/data
       - dentacare-logs:/app/logs
-    depends_on:
-      - prometheus
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
@@ -23,20 +19,36 @@ services:
       retries: 3
       start_period: 60s
 
-  # ─── Prometheus (metrics scraper) ────────────────────────────────────────────
+  # ─── Prometheus ──────────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.52.0
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
     restart: unless-stopped
 
-  # ─── Grafana (dashboards) ────────────────────────────────────────────────────
+  # ─── Alertmanager ─────────────────────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    environment:
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-https://hooks.slack.com/placeholder}
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    restart: unless-stopped
+
+  # ─── Grafana ─────────────────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:11.0.0
     ports:
