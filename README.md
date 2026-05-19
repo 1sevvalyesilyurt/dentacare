@@ -59,6 +59,8 @@ In Grafana: **Dashboards → Import → ID `10915`** (ASP.NET Core & .NET Monito
 
 Metrics endpoint: `GET /metrics` — scraped automatically by Prometheus every 15 s.
 
+Alerting rules (in `prometheus/alerts.yml`): ServiceDown · HighErrorRate · SlowRequests · HighRequestVolume. Routed via Alertmanager to Slack — set `SLACK_WEBHOOK_URL` in your `.env`.
+
 ---
 
 ## Running Tests
@@ -131,9 +133,15 @@ DentalClinic.PlaywrightTests/  # NUnit Playwright E2E — real browser, real DB 
 
 Dockerfile                     # Multi-stage production image (sdk:9.0 → aspnet:9.0)
 .dockerignore                  # Excludes test projects, bins, secrets
-docker-compose.yml             # App + Prometheus + Grafana stack
+docker-compose.yml             # App + Prometheus + Alertmanager + Grafana stack
 prometheus/prometheus.yml      # Scrape config (15s interval → /metrics)
+prometheus/alerts.yml          # 5 alert rules (down, error rate, latency, traffic)
+alertmanager/alertmanager.yml  # Slack routing, inhibit rules
 grafana/provisioning/          # Auto-provisioned Prometheus datasource
+loadtests/smoke.js             # k6 smoke test (1 VU, 30s) — runs in CI
+loadtests/load.js              # k6 load test (ramp 5→40 VU) — runs on release
+.env.example                   # Required environment variables template
+.github/workflows/release.yml  # v*.*.* tag → GHCR push + GitHub Release
 ```
 
 ---
@@ -146,13 +154,18 @@ GitHub Actions runs on every push and pull request:
 Build (Release + vuln scan)
     ├── Unit & Integration Tests  (205 tests, xUnit)
     ├── Playwright E2E Tests      (58 tests, Chromium headless)
-    └── Docker Build              (Dockerfile validation, BuildKit cache)
+    ├── Docker Build              (Dockerfile validation, BuildKit cache)
+    └── Staging Smoke Test        (k6, Docker container, main branch only)
+
+v*.*.* tag push:
+    Tests → Docker push to GHCR → GitHub Release (auto changelog)
 ```
 
-- NuGet packages, Playwright browsers, and Docker BuildKit cache are cached between runs.
+- NuGet, Playwright browsers, and Docker BuildKit layer cache are cached between runs.
 - Test results published as PR check annotations (`dorny/test-reporter`).
 - Playwright trace archives uploaded as artifacts on test failure.
 - Build fails on known vulnerable NuGet packages (`dotnet list package --vulnerable`).
+- **Load test** (`loadtests/load.js`) runs automatically on release tags after staging smoke.
 
 ---
 
@@ -169,6 +182,7 @@ Build (Release + vuln scan)
 | Audit logging | Serilog `AUDIT` prefix on login success / failure / lockout |
 | Health check | `GET /health` — EF Core DB connectivity probe |
 | Metrics | `GET /metrics` — Prometheus scrape endpoint (HTTP request count, duration, in-flight) |
+| Alerting | Prometheus rules → Alertmanager → Slack (5 rules: down, error rate, latency, traffic) |
 
 ---
 

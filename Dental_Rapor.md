@@ -3,12 +3,12 @@
 
 ---
 
-> **Document Version:** 2.0
+> **Document Version:** 2.2
 > **Date:** 2026-05-19
 > **Methodology:** Kruchten's 4+1 Architectural View Model
 > **Technology Stack:** ASP.NET Core 9 MVC · Entity Framework Core 9 · SQLite · Bootstrap 5
 > **Test Coverage:** 55 unit · 150 integration · 58 Playwright E2E = **263 total tests**
-> **CI/CD:** GitHub Actions (build → unit/integration + E2E + Docker, parallel jobs)
+> **CI/CD:** GitHub Actions — 5 jobs (build · unit/integration · playwright · docker · staging smoke) + release workflow (tag → GHCR + GitHub Release)
 
 ---
 
@@ -845,13 +845,21 @@ DentaCare/                                  ← Solution root
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                                     ← GitHub Actions: build · test · docker (parallel)
+│       ├── ci.yml                                     ← CI: build · test · docker · staging-smoke (5 jobs)
+│       └── release.yml                                ← Release: tests → GHCR push → GitHub Release
 │
 ├── Dockerfile                                         ← Multi-stage: sdk:9.0 → aspnet:9.0, non-root user
 ├── .dockerignore                                      ← Excludes test projects, bins, secrets
-├── docker-compose.yml                                 ← App + Prometheus + Grafana stack
+├── .env.example                                       ← Environment variables template
+├── docker-compose.yml                                 ← App + Prometheus + Alertmanager + Grafana
 ├── prometheus/
-│   └── prometheus.yml                                 ← Scrape config: dentacare:8080/metrics every 15s
+│   ├── prometheus.yml                                 ← Scrape config + alertmanager + rule_files
+│   └── alerts.yml                                     ← 5 alert rules (down, error rate, latency, traffic)
+├── alertmanager/
+│   └── alertmanager.yml                               ← Slack routing, inhibit rules, SLACK_WEBHOOK_URL
+├── loadtests/
+│   ├── smoke.js                                       ← k6 smoke (1 VU, 30s) — runs in CI staging job
+│   └── load.js                                        ← k6 load (ramp 5→40 VU) — runs on release tags
 └── grafana/
     └── provisioning/datasources/
         └── prometheus.yml                             ← Auto-provisioned Prometheus datasource
@@ -971,19 +979,29 @@ flowchart LR
     Build --> UT
     Build --> PW
     Build --> Docker["🐳 Docker Build\nDockerfile validation\nBuildKit cache"]
+    Build --> Staging["🏗️ Staging Smoke\nDocker run + k6\nmain branch only"]
 
     UT -->|TRX artifacts\nPR check annotations| Done["✅ All green"]
     PW -->|TRX + traces on failure| Done
     Docker --> Done
+    Staging --> Done
+```
+
+**Release workflow** (triggered by `v*.*.*` tag):
+```
+Tests → Build & push to GHCR → Create GitHub Release (auto changelog)
+                                        ↓ (on release tags only)
+                               ⚡ Load Test (k6, ramp 5→40 VU, 6 min)
 ```
 
 **Pipeline features:**
 - `concurrency` cancels in-progress runs for the same branch/PR.
-- NuGet packages, Playwright browsers, and Docker BuildKit layer cache are cached across runs.
+- NuGet, Playwright browsers, and Docker BuildKit layer cache are cached across runs.
 - `dorny/test-reporter@v1` publishes TRX results as PR check annotations.
-- Playwright trace `.zip` files uploaded as artifacts on failure for post-mortem debugging.
-- `dotnet list package --vulnerable --include-transitive` blocks the build if known vulnerabilities are found.
-- Docker job validates the multi-stage Dockerfile on every push (push to registry deferred to CD step).
+- Playwright trace `.zip` uploaded as artifacts on failure for post-mortem debugging.
+- `dotnet list package --vulnerable` blocks the build on known CVEs.
+- Staging smoke (k6, 1 VU, 30s) validates the Docker image against real HTTP traffic on every `main` push.
+- Load test (k6, ramp to 40 VU) runs automatically after staging on release tags.
 
 ---
 
@@ -1017,7 +1035,12 @@ flowchart LR
 | Portability | SQLite (file-based, no server), Docker-compatible Kestrel | ✅ |
 | Maintainability | Service/Controller separation, interface contracts, EF migration history | ✅ |
 | Containerization | Dockerfile (multi-stage, non-root user, health check) + docker-compose | ✅ |
-| Continuous Integration | GitHub Actions — 4 parallel jobs (build/test/playwright/docker), < 4 min | ✅ |
+| Alerting | Prometheus alert rules + Alertmanager → Slack (5 rules) | ✅ |
+| Load Testing | k6 smoke (CI) + k6 load ramp 5→40 VU (release tags) | ✅ |
+| Release Management | `release.yml`: tests → GHCR push → GitHub Release (auto changelog) | ✅ |
+| Secret Management | `.env.example` template; `SLACK_WEBHOOK_URL`, `SECRETARY_PASSWORD` via env | ✅ |
+| Staging | Docker-based smoke environment in CI (`staging` GitHub Environment) | ✅ |
+| Continuous Integration | GitHub Actions — 5 jobs (build/test/playwright/docker/staging), < 5 min | ✅ |
 
 ---
 
@@ -1028,3 +1051,4 @@ flowchart LR
 | 1.0 | 2026-04-30 | Initial submission — Use Case View, Logical View, Process View (Stage 1 scope) |
 | 2.0 | 2026-05-19 | Added Development View (Section 4) and Physical View (Section 5); added QA Summary (Section 6); corrected technology stack (SQLite, not SQL Server); added UC-SYS03 (notification cleanup), BR-07 (rate limiting / lockout); documented 263-test suite and GitHub Actions CI/CD pipeline |
 | 2.1 | 2026-05-19 | Added Dockerfile + docker-compose + monitoring stack (Prometheus + Grafana); added prometheus-net.AspNetCore metrics middleware (`/metrics`); updated Section 4.1 project tree, Section 4.3 packages, Section 5.4 CI diagram and Section 6.2 non-functional requirements |
+| 2.2 | 2026-05-19 | Added alerting (Prometheus alert rules + Alertmanager/Slack), load testing (k6 smoke + load), staging environment (Docker-based smoke in CI), secret management (`.env.example`), release workflow (`release.yml` → GHCR + GitHub Release); updated Section 4.1 project tree, Section 5.4 CI/release diagrams, Section 6.2 non-functional requirements |
