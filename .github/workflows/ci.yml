@@ -262,11 +262,15 @@ jobs:
           docker logs dentacare-staging
           exit 1
 
+      # k6-action runs inside Docker and can't reach host's localhost.
+      # Install k6 directly on the runner so it shares the host network.
+      - name: Install k6
+        run: |
+          curl -s https://packagecloud.io/install/repositories/grafana/k6/script.deb.sh | sudo bash
+          sudo apt-get install -y k6
+
       - name: Run k6 smoke test
-        uses: grafana/k6-action@v0.3.1
-        with:
-          filename: loadtests/smoke.js
-          flags: --env BASE_URL=http://localhost:8080
+        run: k6 run --env BASE_URL=http://localhost:8080 loadtests/smoke.js
 
       - name: Stop container
         if: always()
@@ -301,11 +305,13 @@ jobs:
             dentacare:loadtest
           sleep 30
 
+      - name: Install k6
+        run: |
+          curl -s https://packagecloud.io/install/repositories/grafana/k6/script.deb.sh | sudo bash
+          sudo apt-get install -y k6
+
       - name: Run k6 load test
-        uses: grafana/k6-action@v0.3.1
-        with:
-          filename: loadtests/load.js
-          flags: --env BASE_URL=http://localhost:8080
+        run: k6 run --env BASE_URL=http://localhost:8080 loadtests/load.js
 
       - name: Stop container
         if: always()
