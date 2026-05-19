@@ -266,8 +266,11 @@ jobs:
       # Install k6 directly on the runner so it shares the host network.
       - name: Install k6
         run: |
-          curl -s https://packagecloud.io/install/repositories/grafana/k6/script.deb.sh | sudo bash
-          sudo apt-get install -y k6
+          wget -q https://github.com/grafana/k6/releases/download/v0.53.0/k6-v0.53.0-linux-amd64.tar.gz \
+            -O /tmp/k6.tar.gz
+          tar xzf /tmp/k6.tar.gz -C /tmp
+          sudo mv /tmp/k6-v0.53.0-linux-amd64/k6 /usr/local/bin/k6
+          k6 version
 
       - name: Run k6 smoke test
         run: k6 run --env BASE_URL=http://localhost:8080 loadtests/smoke.js
@@ -307,8 +310,10 @@ jobs:
 
       - name: Install k6
         run: |
-          curl -s https://packagecloud.io/install/repositories/grafana/k6/script.deb.sh | sudo bash
-          sudo apt-get install -y k6
+          wget -q https://github.com/grafana/k6/releases/download/v0.53.0/k6-v0.53.0-linux-amd64.tar.gz \
+            -O /tmp/k6.tar.gz
+          tar xzf /tmp/k6.tar.gz -C /tmp
+          sudo mv /tmp/k6-v0.53.0-linux-amd64/k6 /usr/local/bin/k6
 
       - name: Run k6 load test
         run: k6 run --env BASE_URL=http://localhost:8080 loadtests/load.js
