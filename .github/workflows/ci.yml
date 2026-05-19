@@ -11,6 +11,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# dorny/test-reporter requires checks:write to create PR check annotations.
+# contents:read is the safe minimum for private repos.
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 env:
   DOTNET_VERSION: '9.0.x'
   BUILD_CONFIGURATION: Release
