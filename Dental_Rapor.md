@@ -8,7 +8,7 @@
 > **Methodology:** Kruchten's 4+1 Architectural View Model
 > **Technology Stack:** ASP.NET Core 9 MVC · Entity Framework Core 9 · SQLite · Bootstrap 5
 > **Test Coverage:** 55 unit · 150 integration · 58 Playwright E2E = **263 total tests**
-> **CI/CD:** GitHub Actions (build → unit/integration + E2E, parallel jobs)
+> **CI/CD:** GitHub Actions (build → unit/integration + E2E + Docker, parallel jobs)
 
 ---
 
@@ -843,9 +843,18 @@ DentaCare/                                  ← Solution root
 │       ├── SecretaryTests.cs     ← 19 tests: full admin panel (doctors, services, leaves, payments, calendar)
 │       └── NotificationTests.cs  ←  4 tests: JSON endpoint, mark-as-read, navbar badge
 │
-└── .github/
-    └── workflows/
-        └── ci.yml                                     ← GitHub Actions CI pipeline
+├── .github/
+│   └── workflows/
+│       └── ci.yml                                     ← GitHub Actions: build · test · docker (parallel)
+│
+├── Dockerfile                                         ← Multi-stage: sdk:9.0 → aspnet:9.0, non-root user
+├── .dockerignore                                      ← Excludes test projects, bins, secrets
+├── docker-compose.yml                                 ← App + Prometheus + Grafana stack
+├── prometheus/
+│   └── prometheus.yml                                 ← Scrape config: dentacare:8080/metrics every 15s
+└── grafana/
+    └── provisioning/datasources/
+        └── prometheus.yml                             ← Auto-provisioned Prometheus datasource
 ```
 
 ### 4.2 Module Dependency Diagram
@@ -871,6 +880,7 @@ flowchart TD
 | `Microsoft.EntityFrameworkCore.InMemory` | 9.0.4 | In-memory DB for unit/integration tests |
 | `Serilog.AspNetCore` | 8.0.3 | Structured logging to file and console |
 | `QuestPDF` | 2025.7.4 | Code-first PDF invoice generation |
+| `prometheus-net.AspNetCore` | 8.2.1 | `GET /metrics` endpoint + `UseHttpMetrics()` middleware |
 | `Microsoft.Playwright.NUnit` | 1.49.0 | Browser automation for E2E tests |
 | `xunit` | 2.9.2 | Unit and integration test framework |
 | `Moq` | 4.20.72 | Mock objects for service-layer unit tests |
@@ -960,17 +970,20 @@ flowchart LR
     Push --> Build
     Build --> UT
     Build --> PW
+    Build --> Docker["🐳 Docker Build\nDockerfile validation\nBuildKit cache"]
 
     UT -->|TRX artifacts\nPR check annotations| Done["✅ All green"]
     PW -->|TRX + traces on failure| Done
+    Docker --> Done
 ```
 
 **Pipeline features:**
 - `concurrency` cancels in-progress runs for the same branch/PR.
-- NuGet packages and Playwright browsers cached across runs (keyed by project hashes and Playwright version).
+- NuGet packages, Playwright browsers, and Docker BuildKit layer cache are cached across runs.
 - `dorny/test-reporter@v1` publishes TRX results as PR check annotations.
 - Playwright trace `.zip` files uploaded as artifacts on failure for post-mortem debugging.
 - `dotnet list package --vulnerable --include-transitive` blocks the build if known vulnerabilities are found.
+- Docker job validates the multi-stage Dockerfile on every push (push to registry deferred to CD step).
 
 ---
 
@@ -1003,7 +1016,8 @@ flowchart LR
 | Testability | 263 automated tests, WebApplicationFactory, Playwright E2E | ✅ |
 | Portability | SQLite (file-based, no server), Docker-compatible Kestrel | ✅ |
 | Maintainability | Service/Controller separation, interface contracts, EF migration history | ✅ |
-| Continuous Integration | GitHub Actions — 3 parallel jobs, < 3 min end-to-end | ✅ |
+| Containerization | Dockerfile (multi-stage, non-root user, health check) + docker-compose | ✅ |
+| Continuous Integration | GitHub Actions — 4 parallel jobs (build/test/playwright/docker), < 4 min | ✅ |
 
 ---
 
@@ -1013,3 +1027,4 @@ flowchart LR
 |---------|------|---------|
 | 1.0 | 2026-04-30 | Initial submission — Use Case View, Logical View, Process View (Stage 1 scope) |
 | 2.0 | 2026-05-19 | Added Development View (Section 4) and Physical View (Section 5); added QA Summary (Section 6); corrected technology stack (SQLite, not SQL Server); added UC-SYS03 (notification cleanup), BR-07 (rate limiting / lockout); documented 263-test suite and GitHub Actions CI/CD pipeline |
+| 2.1 | 2026-05-19 | Added Dockerfile + docker-compose + monitoring stack (Prometheus + Grafana); added prometheus-net.AspNetCore metrics middleware (`/metrics`); updated Section 4.1 project tree, Section 4.3 packages, Section 5.4 CI diagram and Section 6.2 non-functional requirements |

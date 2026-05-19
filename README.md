@@ -28,11 +28,14 @@ ASP.NET Core 9 MVC · Entity Framework Core 9 · SQLite · Bootstrap 5
 | UI | Bootstrap 5 · Bootstrap Icons | 5.3 |
 | Logging | Serilog (file + console) | 8.0.3 |
 | PDF | QuestPDF (Community) | 2025.7.4 |
+| Metrics | prometheus-net.AspNetCore | 8.2.1 |
 | E2E Tests | Microsoft Playwright | 1.49.0 |
 
 ---
 
-## Quick Start (Development)
+## Quick Start
+
+### Development (dotnet run)
 
 ```bash
 dotnet run --project DentalClinic.Web
@@ -40,6 +43,21 @@ dotnet run --project DentalClinic.Web
 ```
 
 Default secretary login: `secretary@dentacare.com` / `Admin@123`
+
+### Docker + Monitoring stack
+
+```bash
+# Start app + Prometheus + Grafana
+SECRETARY_PASSWORD=StrongPass@2026! docker compose up -d
+
+# http://localhost:8080  → DentaCare
+# http://localhost:9090  → Prometheus
+# http://localhost:3000  → Grafana (admin / admin)
+```
+
+In Grafana: **Dashboards → Import → ID `10915`** (ASP.NET Core & .NET Monitoring).
+
+Metrics endpoint: `GET /metrics` — scraped automatically by Prometheus every 15 s.
 
 ---
 
@@ -110,6 +128,12 @@ DentalClinic.PlaywrightTests/  # NUnit Playwright E2E — real browser, real DB 
                                # SecretaryTests · NotificationTests
 
 .github/workflows/ci.yml       # GitHub Actions CI pipeline
+
+Dockerfile                     # Multi-stage production image (sdk:9.0 → aspnet:9.0)
+.dockerignore                  # Excludes test projects, bins, secrets
+docker-compose.yml             # App + Prometheus + Grafana stack
+prometheus/prometheus.yml      # Scrape config (15s interval → /metrics)
+grafana/provisioning/          # Auto-provisioned Prometheus datasource
 ```
 
 ---
@@ -120,11 +144,12 @@ GitHub Actions runs on every push and pull request:
 
 ```
 Build (Release + vuln scan)
-    ├── Unit & Integration Tests  (55 + 150 = 205 tests, xUnit)
-    └── Playwright E2E Tests      (58 tests, Chromium headless)
+    ├── Unit & Integration Tests  (205 tests, xUnit)
+    ├── Playwright E2E Tests      (58 tests, Chromium headless)
+    └── Docker Build              (Dockerfile validation, BuildKit cache)
 ```
 
-- NuGet packages and Playwright browsers are cached between runs.
+- NuGet packages, Playwright browsers, and Docker BuildKit cache are cached between runs.
 - Test results published as PR check annotations (`dorny/test-reporter`).
 - Playwright trace archives uploaded as artifacts on test failure.
 - Build fails on known vulnerable NuGet packages (`dotnet list package --vulnerable`).
@@ -143,6 +168,7 @@ Build (Release + vuln scan)
 | Role authorization | `[Authorize(Roles = "...")]` on every controller class |
 | Audit logging | Serilog `AUDIT` prefix on login success / failure / lockout |
 | Health check | `GET /health` — EF Core DB connectivity probe |
+| Metrics | `GET /metrics` — Prometheus scrape endpoint (HTTP request count, duration, in-flight) |
 
 ---
 
